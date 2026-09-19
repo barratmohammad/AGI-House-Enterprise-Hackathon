@@ -41,6 +41,7 @@
   h3 { font-size: 17px; margin: 0; font-weight: 600; line-height: 1.3; }
   .sub { color: var(--ink-2); font-size: 12px; }
   .spacer { flex: 1; }
+  select { max-width: 270px; text-overflow: ellipsis; }
   select, button { font: inherit; color: var(--ink); background: var(--surface);
                    border: 1px solid var(--axis); border-radius: 6px; padding: 5px 10px; }
   button { cursor: pointer; }
@@ -162,6 +163,35 @@
   .empty { color: var(--ink-2); padding: 18px 0 6px; }
   .err { color: var(--critical); font-size: 13px; margin-top: 8px; }
 
+  /* Live: things that just changed say so once, then settle. */
+  .row { transition: background .2s; }
+  /* The row that moved travels over its neighbours, on a solid ground of its own. */
+  .row.changed { animation: pulse 2.2s ease-out; position: relative; z-index: 1; }
+  @keyframes pulse { 0%, 35% { background: var(--mark); } 100% { background: var(--surface); } }
+  .delta { font-size: 11.5px; color: var(--ink-2); margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .new-tag { font: 600 10px var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--ink);
+             background: var(--mark); border-radius: 3px; padding: 0 5px; flex: none; }
+  li.is-new, .evi.is-new, .chip.is-new { background: color-mix(in srgb, var(--mark) 55%, transparent); border-radius: 4px; }
+  .ev.is-new { box-shadow: inset 3px 0 0 var(--warning); padding-left: 10px; }
+  .banner { display: flex; gap: 8px; align-items: center; font-size: 12.5px; background: var(--sunk);
+            border-radius: 8px; padding: 8px 10px; margin: 0 0 12px; color: var(--ink-2); }
+  .banner strong { color: var(--ink); }
+  .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--axis); border-top-color: var(--series);
+          animation: spin .8s linear infinite; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .row.changed, .ev.flash, .spin { animation: none; } }
+
+  /* Presenter strip: the acts, in the order the story wants them. */
+  #stage { display: none; gap: 10px; align-items: stretch; padding: 10px 20px; border-bottom: 1px solid var(--hair);
+           background: var(--surface); flex-wrap: wrap; }
+  #stage.on { display: flex; }
+  #stage .lead { align-self: center; font-size: 12px; color: var(--ink-2); max-width: 150px; line-height: 1.35; }
+  .act { text-align: left; max-width: 230px; padding: 7px 11px; line-height: 1.3; }
+  .act b { display: block; font-size: 13px; } .act span { font-size: 11.5px; color: var(--ink-2); }
+  .act.played { background: var(--sunk); border-style: dashed; }
+  .act.played b::before { content: "✓ "; color: var(--good-ink); }
+  #stage .right { margin-left: auto; align-self: center; display: flex; gap: 8px; align-items: center; }
+
   #tip { position: fixed; z-index: 20; pointer-events: none; background: var(--ink); color: var(--page);
          border-radius: 6px; padding: 6px 9px; font-size: 12px; max-width: 320px; display: none;
          box-shadow: 0 4px 14px rgba(0,0,0,.25); }
@@ -172,7 +202,7 @@
 <header>
   <div>
     <h1>Eval priorities</h1>
-    <div class="sub">Which failures cost the most, and the eval case each one should become · static snapshot, fictional data</div>
+    <div class="sub">Which failures cost the most, and the eval case each one should become · recorded run, fictional data</div>
   </div>
   <div class="spacer"></div>
   <label class="sub" for="software">Tracked AI application</label>
@@ -181,7 +211,13 @@
     <button id="by-cost" aria-pressed="true">Rank by cost</button>
     <button id="by-volume" aria-pressed="false">Rank by volume</button>
   </div>
+  <div class="seg" id="clock" role="group" aria-label="Cost as of">
+    <button data-days="0" aria-pressed="true">Now</button>
+    <button data-days="7" aria-pressed="false">+7 days</button>
+    <button data-days="30" aria-pressed="false">+30 days</button>
+  </div>
 </header>
+<div id="stage" role="group" aria-label="Live events"></div>
 
 <main>
   <section id="left">
@@ -199,7 +235,8 @@
 <script>
 const SEVERITIES = ["low", "medium", "high", "critical"];
 const state = { software: [], softwareId: null, items: [], weights: null, by: "cost",
-                threadId: null, story: null, error: null };
+                threadId: null, story: null, drafting: false, error: null,
+                acts: [], asOf: 0, busy: null, seenEvents: null };
 
 // ---- tiny DOM helper: text always goes in as text, never as markup ----
 function h(tag, attrs, ...kids) {
@@ -223,19 +260,45 @@ function put(el, ...kids) {
 }
 const $ = (id) => document.getElementById(id);
 const fmt = (n, d = 1) => Number(n).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: Number.isInteger(n) ? 0 : Math.min(d, 1) });
-const days = (n) => `${fmt(n)} day${Number(n) === 1 ? "" : "s"}`;
+// An event seconds old has been live "0 days", which reads as a bug rather than as "just now".
+const days = (n) => Number(n) < 0.05 ? "under an hour" : `${fmt(n)} day${Number(n) === 1 ? "" : "s"}`;
 const plural = (n, word) => `${n} ${word}${Number(n) === 1 ? "" : "s"}`;
 const SRC = { jira: "JIRA", email: "EMAIL", splunk: "SPLUNK" };
 
-// No backend: every "request" is a lookup in the hard-coded snapshot (data.js).
-async function api(path) {
-  const D = window.DEMO_DATA;
-  if (path === "/software") return { items: D.software };
-  if (path.startsWith("/threads?")) return D.threads;
-  const story = D.stories[path.split("/")[2]];
-  if (!story) throw new Error("not in the snapshot");
-  return story;
+// ---------------------------------------------------------------------------
+// Where the data comes from. The page only ever asks a source for what to show;
+// it never computes a rank, a cost or a draft itself.
+//   replay — frames recorded from a live run (data.js). Same screens, no backend.
+// ---------------------------------------------------------------------------
+function replaySource(D) {
+  // frames[0] is the seeded state. Each act recorded two more: the moment it landed
+  // (old draft, marked stale, revision running) and the moment the revision arrived.
+  let at = 0, settle = null;
+  const frame = () => D.frames[at];
+  const stories = () => Object.assign({}, ...D.frames.slice(0, at + 1).map((f) => f.stories));
+  return {
+    kind: "replay", pollMs: 700, showStage: true,
+    software: async () => D.software,
+    threads: async (sw, asOf) => frame().threads[String(asOf)] || frame().threads["0"],
+    story: async (id) => { const s = stories()[id]; if (!s) throw new Error("not in the recording"); return s; },
+    acts: async () => D.acts.map((a) => {
+      const landed = D.frames.findIndex((f) => f.act === a.id);
+      return { ...a, played: landed > -1 && landed <= at, available: landed === at + 1 };
+    }),
+    play: async (sw, id) => {
+      const landed = D.frames.findIndex((f) => f.act === id);
+      if (landed !== at + 1) throw new Error("the recording plays in order");
+      at = landed;
+      const settled = D.frames.findIndex((f, i) => i > landed && f.settles === id);
+      clearTimeout(settle);
+      if (settled > -1) settle = setTimeout(() => { if (at === landed) at = settled; }, D.revision_ms || 4000);
+      return { thread_ids: frame().touched || [] };
+    },
+    reset: async () => { clearTimeout(settle); at = 0; },
+    draft: null,
+  };
 }
+const source = replaySource(window.DEMO_DATA);
 
 // ---- tooltip: one floating readout; value leads, label follows ----
 const tip = $("tip");
@@ -290,8 +353,11 @@ function renderHero() {
       ", which hold only ", h("strong", null, eventShare + "%"), ` of the ${totalEvents} events. Cost is not volume.`)));
 }
 
-function renderList() {
+// Rows keep their place in the DOM across renders so a change of rank can be shown
+// as movement (first/last/invert/play) instead of a list that silently re-sorts.
+function renderList(changed) {
   const list = $("list");
+  const was = new Map([...list.children].map((el) => [el.dataset.id, el.getBoundingClientRect().top]));
   $("list-title").textContent = state.by === "cost" ? "Threads by cost" : "Threads by volume (event count)";
   $("by-cost").setAttribute("aria-pressed", state.by === "cost");
   $("by-volume").setAttribute("aria-pressed", state.by === "volume");
@@ -300,17 +366,20 @@ function renderList() {
 
   list.replaceChildren(...ranked().map((item, idx) => {
     const { thread: t, cost: c } = item;
-    const measure = (label, value, max, text, quiet) => h("div", { class: "measure" },
+    const measure = (label, value, max, text, quiet, note) => h("div", { class: "measure" },
       h("span", null, label),
       h("span", { class: "track" },
-        h("span", { class: "bar" + (quiet ? " quiet" : ""), style: `width:${Math.max(1, 78 * value / max)}%` }),
-        h("span", { class: "val" }, text)));
-    const row = h("button", { class: "row", "aria-current": t.id === state.threadId ? "true" : null,
+        h("span", { class: "bar" + (quiet ? " quiet" : ""), style: `width:${Math.max(1, 70 * value / max)}%` }),
+        h("span", { class: "val" }, text), note && h("span", { class: "delta" }, note)));
+    const delta = changed && changed.get(t.id);
+    const row = h("button", { class: "row" + (delta != null ? " changed" : ""), "data-id": t.id,
+                              "aria-current": t.id === state.threadId ? "true" : null,
                               onclick: () => selectThread(t.id) },
       h("span", { class: "rank" }, idx + 1),
       h("span", null,
         h("span", { class: "title" }, t.title || "(untitled)"),
-        measure("Cost", c.score, maxCost, fmt(c.score)),
+        measure("Cost", c.score, maxCost, fmt(c.score), false,
+                delta ? `${delta > 0 ? "+" : "−"}${fmt(Math.abs(delta))}` : null),
         measure("Events", t.event_count, maxEvents, String(t.event_count), true),
         h("span", { class: "chips" },
           c.peak_severity && h("span", { class: "chip" },
@@ -319,9 +388,20 @@ function renderList() {
           c.recurrences > 0 && h("span", { class: "chip solid" }, `↺ came back ×${c.recurrences}`),
           c.still_live && h("span", { class: "chip" }, h("i", { class: "dot", style: "background:var(--warning)" }), "open, still accruing"),
           h("span", { class: "chip" }, (t.source_types || []).map((s) => SRC[s] || s).join(" + ")),
-          item.has_eval_draft && h("span", { class: "chip" }, h("span", { class: "ok-ink" }, "✓"), "eval drafted"))));
+          item.redrafting ? h("span", { class: "chip" }, h("i", { class: "spin" }), "revising eval")
+            : item.has_eval_draft && h("span", { class: "chip" }, h("span", { class: "ok-ink" }, "✓"), "eval drafted"))));
     return row;
   }));
+
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for (const el of list.children) {
+    const before = was.get(el.dataset.id);
+    if (before == null) continue;
+    const dy = before - el.getBoundingClientRect().top;
+    if (Math.abs(dy) < 2) continue;
+    el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }],
+               { duration: 650, easing: "cubic-bezier(.2,.8,.2,1)" });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -344,6 +424,7 @@ function costCard(item) {
     h("h2", null, "Why it cost this much"),
     h("h3", null, t.title || "(untitled)"),
     h("div", { class: "sub", style: "margin-top:4px" },
+      (state.asOf ? `as it would stand in ${state.asOf} days · ` : "") +
       `${t.state}${c.still_live ? " — cost is still accruing" : ""} · ${plural(t.event_count, "event")} · ` +
       (t.source_types || []).map((s) => SRC[s] || s).join(" + ")),
     formula,
@@ -399,13 +480,16 @@ function severityStrip(item) {
     h("div", { class: "reading" }, parts.join(" → ")));
 }
 
+// An event is "new" if it arrived while this page was watching the thread.
+const isNewEvent = (e) => state.seenEvents != null && !state.seenEvents.has(e.id);
+
 function eventsCard() {
   const events = state.story.events;
   return h("div", { class: "card thread", id: "thread-card" },
     h("h2", null, `The thread · ${plural(events.length, "event")}`),
-    ...events.map((e) => h("div", { class: "ev", id: "ev-" + e.id },
+    ...events.map((e) => h("div", { class: "ev" + (isNewEvent(e) ? " is-new" : ""), id: "ev-" + e.id },
       h("div", { class: "ev-head" },
-        h("span", { class: "lbl" }, e.label), h("span", { class: "src" }, SRC[e.source_type] || e.source_type),
+        h("span", { class: "lbl" }, e.label), isNewEvent(e) && h("span", { class: "new-tag" }, "just now"), h("span", { class: "src" }, SRC[e.source_type] || e.source_type),
         e.source_id && e.source_type !== "email" && h("span", null, e.source_id),
         h("span", null, new Date(e.occurred_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })),
         e.who && h("span", null, e.who),
@@ -445,57 +529,99 @@ function flashEvent(eventId, quote) {
   el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
 }
 
+// What a revision changed, read off the two versions. Text the model kept word for
+// word is "the same"; evidence is new when it cites an event the old draft never saw.
+function draftDiff(d, prev) {
+  if (!prev) return null;
+  const had = (list) => new Set((list || []).map((x) => (typeof x === "string" ? x : x.check)));
+  const known = new Set(prev.event_ids || (prev.evidence || []).map((e) => e.signal_event_id));
+  const isNew = {
+    criterion: (c) => !had(prev.pass_criteria).has(c.check),
+    rerun: (r) => !had(prev.rerun_on).has(r),
+    variant: (v) => !had(prev.variants).has(v),
+    gap: (g) => !had(prev.gaps).has(g),
+    evidence: (e) => !known.has(e.signal_event_id),
+  };
+  const count = (list, fn) => (list || []).filter(fn).length;
+  const parts = [];
+  if (d.regression && !prev.regression) parts.push("now a regression test");
+  if (d.expected_behavior !== prev.expected_behavior) parts.push("expected behaviour sharpened");
+  const n = (k, one, many) => { if (k) parts.push(`${k} new ${k === 1 ? one : many}`); };
+  n(count(d.pass_criteria, isNew.criterion), "criterion", "criteria");
+  n(count(d.variants, isNew.variant), "variant", "variants");
+  n(count(d.rerun_on, isNew.rerun), "re-run trigger", "re-run triggers");
+  n(count(d.evidence, isNew.evidence), "quote", "quotes");
+  return { isNew, parts, becameRegression: d.regression && !prev.regression,
+           expectedChanged: d.expected_behavior !== prev.expected_behavior };
+}
+
 function draftCard(item) {
-  const d = state.story.eval_draft;
+  const d = state.story.eval_draft, redrafting = state.story.redrafting || state.drafting;
   const card = h("div", { class: "card" }, h("h2", null, "Eval case draft"));
   if (!d) {
     put(card,
       h("div", { class: "empty" }, "No draft yet. The thread already holds most of an eval case: what the application was asked, what it answered, and — from whoever verified the fix — what it should have said."),
+      source.draft && h("button", { class: "primary", disabled: state.drafting, onclick: () => draft(false) },
+        state.drafting ? "Drafting from the thread…" : "Draft the eval case"),
       state.error && h("div", { class: "err" }, state.error));
     return card;
   }
+  const diff = draftDiff(d, state.story.eval_draft_previous);
+  const tag = (on, text) => on && h("span", { class: "new-tag" }, text || "new");
   const field = (k, ...body) => h("div", { class: "field" }, h("div", { class: "k" }, k), ...body);
-  const list = (items, render) => h("ul", { class: "plain" }, ...items.map((i) => h("li", null, render(i))));
+  const list = (items, isNew) => h("ul", { class: "plain" }, ...items.map((i) =>
+    h("li", { class: diff && isNew(i) ? "is-new" : null }, tag(diff && isNew(i)), h("span", null, i))));
   const verified = d.evidence.filter((e) => e.verified).length;
 
   put(card,
+    redrafting
+      ? h("div", { class: "banner", role: "status" }, h("i", { class: "spin" }),
+          h("span", null, h("strong", null, "The thread changed."), " Revising this draft from the new events…"))
+      : diff && h("div", { class: "banner" },
+          h("span", null, h("strong", null, "Revised after the thread changed: "),
+            diff.parts.length ? diff.parts.join(" · ") : "nothing needed to change")),
     h("h3", null, d.title),
     h("div", { class: "chips" },
       h("span", { class: "chip solid" }, d.failure_mode),
       h("span", { class: "chip" }, d.eval_type.replace("_", " ")),
-      d.regression && tipOn(h("span", { class: "chip solid", tabindex: "0" }, "↺ regression test"),
-        "Set by the thread's ledger, not the model", "This story was resolved and came back."),
-      d.stale && h("span", { class: "chip" }, h("i", { class: "dot", style: "background:var(--warning)" }), "stale — thread has changed")),
+      d.regression && tipOn(h("span", { class: "chip solid" + (diff && diff.becameRegression ? " is-new" : ""), tabindex: "0" },
+          "↺ regression test", tag(diff && diff.becameRegression)),
+        "Set by the thread's history, not the model", "This story was resolved and came back."),
+      d.stale && !redrafting && h("span", { class: "chip" }, h("i", { class: "dot", style: "background:var(--warning)" }), "stale — thread has changed")),
     h("p", { style: "margin:10px 0 0;color:var(--ink-2)" }, d.summary),
 
     (d.input.setup || d.input.user_message) && field("Input",
       d.input.setup && h("div", { class: "sub", style: "margin-bottom:6px" }, "Setup: " + d.input.setup),
       d.input.user_message && h("div", { class: "quote" }, d.input.user_message)),
     d.observed_output && field("✕ Observed in production", h("div", { class: "quote bad" }, d.observed_output)),
-    field("✓ Expected behaviour", h("div", { class: "quote ok" }, d.expected_behavior)),
+    field(h("span", null, "✓ Expected behaviour ", tag(diff && diff.expectedChanged, "revised")),
+      h("div", { class: "quote ok" }, d.expected_behavior)),
 
     d.pass_criteria.length > 0 && field("Pass criteria",
       h("ul", { class: "plain" }, ...d.pass_criteria.map((c) =>
-        h("li", null, h("span", { class: "grader" }, c.grader), h("span", null, c.check))))),
+        h("li", { class: diff && diff.isNew.criterion(c) ? "is-new" : null },
+          h("span", { class: "grader" }, c.grader), tag(diff && diff.isNew.criterion(c)), h("span", null, c.check))))),
     d.rerun_on.length > 0 && field("Re-run after", h("div", { class: "chips", style: "margin-top:0" },
-      ...d.rerun_on.map((r) => h("span", { class: "chip" }, r)))),
-    d.variants.length > 0 && field("Variants to widen coverage", list(d.variants, (v) => v)),
-    d.gaps.length > 0 && field("The author still has to supply", list(d.gaps, (g) => g)),
+      ...d.rerun_on.map((r) => h("span", { class: "chip" + (diff && diff.isNew.rerun(r) ? " is-new" : "") }, r)))),
+    d.variants.length > 0 && field("Variants to widen coverage", list(d.variants, diff ? diff.isNew.variant : null)),
+    d.gaps.length > 0 && field("The author still has to supply", list(d.gaps, diff ? diff.isNew.gap : null)),
 
     field(`Evidence · ${verified} of ${d.evidence.length} quotes found in the event they cite`,
-      h("div", null, ...d.evidence.map((e) => h("button", { class: "evi", onclick: () => flashEvent(e.signal_event_id, e.quote) },
+      h("div", null, ...d.evidence.map((e) => h("button", { class: "evi" + (diff && diff.isNew.evidence(e) ? " is-new" : ""),
+          onclick: () => flashEvent(e.signal_event_id, e.quote) },
         h("q", null, e.quote),
         h("span", { class: "meta" },
           h("span", { class: "lbl" }, e.event), h("span", { class: "src" }, SRC[e.source_type] || e.source_type),
           h("span", null, "supports " + e.supports.replace("_", " ")),
           e.verified ? h("span", { class: "ok-ink" }, "✓ verified")
-                     : h("span", { class: "warn-ink" }, "⚠ not found in that event")))))),
+                     : h("span", { class: "warn-ink" }, "⚠ not found in that event"),
+          tag(diff && diff.isNew.evidence(e))))))),
 
     h("div", { class: "foot" },
       h("span", null, `${d.model} · ${new Date(d.generated_at).toLocaleString()}`),
       h("span", { class: "spacer" }),
       h("button", { onclick: (ev) => copyDraft(ev.currentTarget, d) }, "Copy as JSON"),
-      ),
+      source.draft && h("button", { disabled: redrafting, onclick: () => draft(true) }, redrafting ? "Revising…" : "Redraft")),
     state.error && h("div", { class: "err" }, state.error));
   return card;
 }
@@ -516,42 +642,148 @@ function renderDetail() {
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
+async function draft(refresh) {
+  state.drafting = true; state.error = null; renderDetail();
+  const threadId = state.threadId;
+  try {
+    await source.draft(threadId, refresh);
+    if (threadId === state.threadId) state.story = await source.story(threadId);
+  } catch (e) { state.error = "Could not draft: " + e.message; }
+  finally { state.drafting = false; renderDetail(); tick(); }
+}
+
 async function selectThread(id) {
-  state.threadId = id; state.error = null; writeHash(); renderList();
+  state.threadId = id; state.error = null; state.seenEvents = null; writeHash(); renderList();
   $("detail").classList.add("loading");          // hold the frame while loading
   try {
-    const story = await api(`/threads/${id}`);
+    const story = await source.story(id);
     if (id !== state.threadId) return;
     state.story = story;
+    state.seenEvents = new Set(story.events.map((e) => e.id));
   } catch (e) { state.story = null; state.error = e.message; }
   $("detail").classList.remove("loading");
   renderDetail();
 }
 
+// The selected thread changed underneath us: reload it, keep the reader's place,
+// and bring the first event they have not seen into view.
+async function refreshStory() {
+  const id = state.threadId;
+  const story = await source.story(id);
+  if (id !== state.threadId) return;
+  const box = $("thread-card"), scroll = box ? box.scrollTop : 0;
+  // New events arrived: what was on screen until now counts as seen. A revision
+  // arriving changes no events, so the "just now" marks outlive it.
+  if (state.story && story.events.length !== state.story.events.length)
+    state.seenEvents = new Set(state.story.events.map((e) => e.id));
+  state.story = story;
+  renderDetail();
+  const fresh = story.events.find((e) => state.seenEvents && !state.seenEvents.has(e.id));
+  if ($("thread-card")) $("thread-card").scrollTop = scroll;
+  if (fresh) flashEvent(fresh.id);
+}
+
+// ---- the poll: ask the source what is true now, and show what moved ----
+const signature = (i) => [i.cost.score, i.thread.event_count, i.thread.state, i.draft_generated_at, !!i.redrafting].join("|");
+let ticking = false;
+async function tick() {
+  if (ticking || !state.softwareId || document.hidden) return;
+  ticking = true;
+  try {
+    const [data, acts] = await Promise.all([source.threads(state.softwareId, state.asOf), source.acts(state.softwareId)]);
+    const before = new Map(state.items.map((i) => [i.thread.id, i]));
+    const changed = new Map();
+    for (const i of data.items) {
+      const old = before.get(i.thread.id);
+      if (old && (old.thread.event_count !== i.thread.event_count || old.thread.state !== i.thread.state))
+        changed.set(i.thread.id, i.cost.score - old.cost.score);
+    }
+    const moved = data.items.length !== state.items.length ||
+      data.items.some((i) => !before.has(i.thread.id) || signature(before.get(i.thread.id)) !== signature(i));
+    const actsMoved = JSON.stringify(acts) !== JSON.stringify(state.acts) || source.actsError !== state.actsError;
+    state.actsError = source.actsError;
+    state.items = data.items; state.weights = data.weights; state.acts = acts;
+    if (actsMoved) renderStage();
+    if (!moved) return;
+    renderHero(); renderList(changed);
+    const mine = data.items.find((i) => i.thread.id === state.threadId), old = before.get(state.threadId);
+    if (mine && old && signature(mine) !== signature(old)) await refreshStory();
+    else if (mine) renderDetail();
+  } catch (_) { /* a missed poll is not worth a banner; the next one will do */ }
+  finally { ticking = false; }
+}
+
+// ---- the stage: acts are chosen by name; nothing else can be sent ----
+function renderStage() {
+  const stage = $("stage");
+  stage.classList.toggle("on", source.showStage && (state.acts.length > 0 || !!source.actsError));
+  if (!source.showStage) return;
+  if (source.actsError) { stage.replaceChildren(h("div", { class: "err", role: "alert", style: "margin:0" }, source.actsError)); return; }
+  stage.replaceChildren(
+    h("div", { class: "lead" }, source.kind === "replay"
+      ? "Recorded from a live run. Play the events in order."
+      : "Live. Each event happens now and lands through the real pipeline."),
+    ...state.acts.map((a) => h("button", { class: "act" + (a.played ? " played" : ""),
+        disabled: !a.available || state.busy != null, onclick: () => playAct(a) },
+      h("b", null, a.title), h("span", null, a.blurb))),
+    h("div", { class: "right" },
+      state.busy && h("span", { class: "sub" }, state.busy),
+      h("button", { disabled: state.busy != null || !state.acts.some((a) => a.played), onclick: resetStage }, "Reset")));
+}
+
+async function playAct(act) {
+  state.busy = "Landing…"; renderStage();
+  try {
+    // Be looking at the story before the event arrives, so it is seen to arrive.
+    if (act.thread_id && act.thread_id !== state.threadId) await selectThread(act.thread_id);
+    await source.play(state.softwareId, act.id);
+  } catch (e) { state.error = e.message; }
+  state.busy = null;
+  await tick(); renderStage();
+}
+
+async function resetStage() {
+  state.busy = "Resetting to the seeded state…"; renderStage();
+  try { await source.reset(state.softwareId); } catch (e) { state.error = e.message; }
+  state.busy = null; state.items = [];
+  await loadSoftware(state.softwareId);          // ids change on a reseed; start clean
+}
+
 async function loadSoftware(id, keepThread) {
   state.softwareId = id; $("software").value = id;
   $("left").classList.add("loading");
-  const data = await api(`/threads?software_id=${id}`);
+  const [data, acts] = await Promise.all([source.threads(id, state.asOf), source.acts(id)]);
   $("left").classList.remove("loading");
-  state.items = data.items; state.weights = data.weights;
-  renderHero(); renderList();
+  state.items = data.items; state.weights = data.weights; state.acts = acts;
+  renderHero(); renderList(); renderStage();
   const wanted = keepThread && state.items.find((i) => i.thread.id === keepThread);
   if (wanted || state.items.length) await selectThread((wanted || state.items[0]).thread.id);
   else { state.threadId = null; state.story = null; writeHash(); renderDetail(); }
 }
 
+async function setClock(daysAhead) {
+  state.asOf = daysAhead;
+  for (const b of $("clock").children) b.setAttribute("aria-pressed", Number(b.dataset.days) === daysAhead);
+  const data = await source.threads(state.softwareId, state.asOf);
+  state.items = data.items; state.weights = data.weights;
+  renderHero(); renderList(); renderDetail();
+}
+
 async function init() {
   const hash = readHash();
   if (hash.by === "volume") state.by = "volume";
-  state.software = (await api("/software")).items;
+  state.software = await source.software();
   const select = $("software");
   select.replaceChildren(...state.software.map((s) =>
     h("option", { value: s.id }, `${s.software_name} — ${s.company_name} (${s.threads} threads)`)));
   select.addEventListener("change", () => loadSoftware(select.value));
   for (const by of ["cost", "volume"]) $("by-" + by).addEventListener("click", () => { state.by = by; writeHash(); renderList(); });
+  for (const b of $("clock").children) b.addEventListener("click", () => setClock(Number(b.dataset.days)));
   if (!state.software.length) { $("hero-card").replaceChildren(h("div", { class: "empty" }, "No software with threads. Seed one: scripts/seed_ai_app_scenario.py")); return; }
   const start = state.software.find((s) => s.id === hash.software) || state.software[0];
   await loadSoftware(start.id, hash.thread);
+  setInterval(tick, source.pollMs);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
 }
 init().catch((e) => { $("hero-card").replaceChildren(h("div", { class: "err" }, "Could not load: " + e.message)); });
 </script>
