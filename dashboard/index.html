@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eval priorities</title>
+<style>
+  /* Tokens by role; dark values are selected, not flipped. The severity ramp is
+     one hue, ordered away from the surface in both modes (validated ordinal). */
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --sunk: #f0efec;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --hair: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,.10);
+    --series: #2a78d6; --series-quiet: #c3c2b7;
+    --sev-low: #86b6ef; --sev-medium: #3987e5; --sev-high: #1c5cab; --sev-critical: #0d366b;
+    --good: #0ca30c; --good-ink: #006300; --warning: #fab219; --critical: #d03b3b;
+    --mark: #fde9b0;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --sunk: #242422;
+      --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --hair: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10);
+      --series: #3987e5; --series-quiet: #52514e;
+      --sev-low: #184f95; --sev-medium: #2a78d6; --sev-high: #6da7ec; --sev-critical: #b7d3f6;
+      --good-ink: #0ca30c; --mark: #5c4a12;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 20px; flex-wrap: wrap;
+           border-bottom: 1px solid var(--hair); background: var(--page);
+           position: sticky; top: 0; z-index: 5; }
+  h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+       margin: 0 0 10px; font-weight: 600; }
+  h3 { font-size: 17px; margin: 0; font-weight: 600; line-height: 1.3; }
+  .sub { color: var(--ink-2); font-size: 12px; }
+  .spacer { flex: 1; }
+  select, button { font: inherit; color: var(--ink); background: var(--surface);
+                   border: 1px solid var(--axis); border-radius: 6px; padding: 5px 10px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--series); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--series); border-color: var(--series); color: #fff; font-weight: 600; }
+  :focus-visible { outline: 2px solid var(--series); outline-offset: 1px; }
+  .seg { display: inline-flex; border: 1px solid var(--axis); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: var(--surface); color: var(--ink-2); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
+
+  main { display: grid; grid-template-columns: minmax(340px, 430px) minmax(0, 1fr); gap: 20px;
+         padding: 20px; align-items: start; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 1000px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 16px; }
+  .card + .card { margin-top: 14px; }
+  .loading { opacity: .45; transition: opacity .15s; }
+
+  /* Headline */
+  .hero { display: flex; gap: 14px; align-items: baseline; }
+  .hero .fig { font-size: 48px; font-weight: 600; line-height: 1; letter-spacing: -.02em; }
+  .hero p { margin: 0; color: var(--ink-2); }
+  .hero strong { color: var(--ink); }
+
+  /* Ranked list: a table with bars in its cells. Two measures, two scales, two columns. */
+  .cols { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 0 10px; }
+  .row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; text-align: left;
+         border: 0; border-top: 1px solid var(--hair); border-radius: 0; background: none;
+         padding: 11px 6px; width: 100%; }
+  .row:hover { background: var(--sunk); border-color: var(--hair); }
+  .row[aria-current="true"] { background: var(--sunk); box-shadow: inset 3px 0 0 var(--series); }
+  .rank { color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 1px; }
+  .row .title { font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical; overflow: hidden; }
+  .measure { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: center;
+             gap: 8px; margin-top: 6px; font-size: 12px; color: var(--ink-2); }
+  .track { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .bar { height: 10px; min-width: 2px; border-radius: 0 4px 4px 0; background: var(--series); }
+  .bar.quiet { background: var(--series-quiet); }
+  .val { color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--ink-2);
+          border: 1px solid var(--hair); border-radius: 999px; padding: 1px 8px; background: var(--surface); }
+  .chip.solid { background: var(--sunk); border-color: transparent; }
+  .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .src { font: 600 10.5px var(--mono); border: 1px solid var(--axis); border-radius: 4px;
+         padding: 0 4px; color: var(--ink-2); }
+
+  /* Cost working */
+  .formula { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 14px 0 4px; }
+  .tile { background: var(--sunk); border-radius: 8px; padding: 8px 12px; min-width: 104px; }
+  .tile .k { font-size: 11.5px; color: var(--ink-2); }
+  .tile .v { font-size: 22px; font-weight: 600; line-height: 1.2; }
+  .tile .n { font-size: 11.5px; color: var(--muted); }
+  .tile.total { background: none; border: 1px solid var(--axis); }
+  .op { align-self: center; color: var(--muted); font-size: 18px; }
+
+  .strip-wrap { margin-top: 18px; }
+  .strip { position: relative; height: 46px; }
+  .strip .base { position: absolute; left: 0; right: 0; top: 33px; height: 1px; background: var(--axis); }
+  .segm { position: absolute; top: 22px; height: 12px; border-radius: 2px; }
+  .segm:hover, .segm:focus-visible { filter: brightness(1.15); }
+  .evdot { position: absolute; top: 3px; width: 24px; height: 24px; margin-left: -12px; background: none;
+           border: 0; padding: 0; display: grid; place-items: center; }
+  .evdot i { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-2);
+             box-shadow: 0 0 0 2px var(--surface); }
+  .evdot:hover i, .evdot:focus-visible i { background: var(--ink); transform: scale(1.25); }
+  .ticks { position: relative; height: 16px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .ticks span:first-child { transform: none; } .ticks span:last-child { transform: translateX(-100%); }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .gapkey { width: 14px; height: 1px; background: var(--axis); }
+  .reading { font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 14px; margin-top: 14px; align-items: start; }
+  @media (max-width: 1250px) { .two { grid-template-columns: minmax(0, 1fr); } }
+  .two > .card { margin-top: 0; }
+  /* Side by side, the thread stays put and scrolls on its own, so a cited event
+     lights up next to the quote that cites it instead of a screen away. */
+  @media (min-width: 1251px) {
+    .two > .thread { position: sticky; top: 72px; max-height: calc(100vh - 92px); overflow: auto; }
+  }
+
+  /* Thread events */
+  .ev { border-top: 1px solid var(--hair); padding: 10px 0; scroll-margin-top: 70px; }
+  .ev:first-of-type { border-top: 0; padding-top: 0; }
+  .ev.flash { animation: flash 1.6s ease-out; }
+  @keyframes flash { from { background: var(--mark); } to { background: transparent; } }
+  .ev-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--ink-2); }
+  .lbl { font: 600 11px var(--mono); color: var(--ink); }
+  .ev-title { font-weight: 600; margin: 4px 0 2px; }
+  .ev-body { color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+  .ev-body.machine { font: 12px/1.5 var(--mono); }
+  mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1px; }
+
+  /* Draft */
+  .field { margin-top: 14px; }
+  .field > .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+  .quote { font: 12.5px/1.55 var(--mono); background: var(--sunk); border-radius: 6px; padding: 8px 10px;
+           white-space: pre-wrap; overflow-wrap: anywhere; }
+  .quote.bad { box-shadow: inset 3px 0 0 var(--critical); }
+  .quote.ok { box-shadow: inset 3px 0 0 var(--good); }
+  ul.plain { list-style: none; margin: 0; padding: 0; }
+  ul.plain li { padding: 5px 0; border-top: 1px solid var(--hair); display: flex; gap: 8px; align-items: baseline; }
+  ul.plain li:first-child { border-top: 0; }
+  .grader { font: 600 10.5px var(--mono); color: var(--ink-2); background: var(--sunk); border-radius: 4px;
+            padding: 1px 6px; white-space: nowrap; flex: none; }
+  .evi { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--hair); border-radius: 0;
+         background: none; padding: 7px 4px; }
+  .evi:first-child { border-top: 0; }
+  .evi:hover { background: var(--sunk); }
+  .evi q { color: var(--ink); quotes: "\201C" "\201D"; }
+  .evi .meta { display: flex; gap: 8px; align-items: center; font-size: 11.5px; color: var(--ink-2); margin-top: 2px; }
+  .ok-ink { color: var(--good-ink); } .warn-ink { color: var(--ink); }
+  .foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; padding-top: 12px;
+          border-top: 1px solid var(--hair); font-size: 12px; color: var(--muted); }
+  .empty { color: var(--ink-2); padding: 18px 0 6px; }
+  .err { color: var(--critical); font-size: 13px; margin-top: 8px; }
+
+  #tip { position: fixed; z-index: 20; pointer-events: none; background: var(--ink); color: var(--page);
+         border-radius: 6px; padding: 6px 9px; font-size: 12px; max-width: 320px; display: none;
+         box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  #tip b { display: block; font-size: 13px; } #tip span { opacity: .78; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Eval priorities</h1>
+    <div class="sub">Which failures cost the most, and the eval case each one should become · static snapshot, fictional data</div>
+  </div>
+  <div class="spacer"></div>
+  <label class="sub" for="software">Tracked AI application</label>
+  <select id="software"></select>
+  <div class="seg" role="group" aria-label="Rank threads by">
+    <button id="by-cost" aria-pressed="true">Rank by cost</button>
+    <button id="by-volume" aria-pressed="false">Rank by volume</button>
+  </div>
+</header>
+
+<main>
+  <section id="left">
+    <div class="card" id="hero-card"></div>
+    <div class="card">
+      <h2 id="list-title">Threads by cost</h2>
+      <div class="cols" id="list"></div>
+    </div>
+  </section>
+  <section id="detail"><div class="card empty">Pick a thread.</div></section>
+</main>
+<div id="tip" role="tooltip"></div>
+
+<script src="data.js"></script>
+<script>
+const SEVERITIES = ["low", "medium", "high", "critical"];
+const state = { software: [], softwareId: null, items: [], weights: null, by: "cost",
+                threadId: null, story: null, error: null };
+
+// ---- tiny DOM helper: text always goes in as text, never as markup ----
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k === "style") el.style.cssText = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  return put(el, ...kids);
+}
+// Node.append() would print "null" / "false" for an absent conditional child; this drops them.
+function put(el, ...kids) {
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+const $ = (id) => document.getElementById(id);
+const fmt = (n, d = 1) => Number(n).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: Number.isInteger(n) ? 0 : Math.min(d, 1) });
+const days = (n) => `${fmt(n)} day${Number(n) === 1 ? "" : "s"}`;
+const plural = (n, word) => `${n} ${word}${Number(n) === 1 ? "" : "s"}`;
+const SRC = { jira: "JIRA", email: "EMAIL", splunk: "SPLUNK" };
+
+// No backend: every "request" is a lookup in the hard-coded snapshot (data.js).
+async function api(path) {
+  const D = window.DEMO_DATA;
+  if (path === "/software") return { items: D.software };
+  if (path.startsWith("/threads?")) return D.threads;
+  const story = D.stories[path.split("/")[2]];
+  if (!story) throw new Error("not in the snapshot");
+  return story;
+}
+
+// ---- tooltip: one floating readout; value leads, label follows ----
+const tip = $("tip");
+function showTip(target, title, sub) {
+  tip.replaceChildren(h("b", null, title), sub ? h("span", null, sub) : null);
+  tip.style.display = "block";
+  const r = target.getBoundingClientRect(), t = tip.getBoundingClientRect();
+  const x = Math.min(Math.max(8, r.left + r.width / 2 - t.width / 2), innerWidth - t.width - 8);
+  const above = r.top - t.height - 8;
+  tip.style.left = x + "px";
+  tip.style.top = (above > 8 ? above : r.bottom + 8) + "px";
+}
+function tipOn(el, title, sub) {
+  const on = () => showTip(el, title, sub), off = () => { tip.style.display = "none"; };
+  el.addEventListener("pointerenter", on); el.addEventListener("focus", on);
+  el.addEventListener("pointerleave", off); el.addEventListener("blur", off);
+  return el;
+}
+
+// ---- hash state, so a reload mid-demo lands where it was ----
+function readHash() { return Object.fromEntries(new URLSearchParams(location.hash.slice(1))); }
+function writeHash() {
+  const p = new URLSearchParams();
+  if (state.softwareId) p.set("software", state.softwareId);
+  if (state.threadId) p.set("thread", state.threadId);
+  if (state.by !== "cost") p.set("by", state.by);
+  history.replaceState(null, "", "#" + p.toString());
+}
+
+// ---------------------------------------------------------------------------
+// Left: headline + ranked list
+// ---------------------------------------------------------------------------
+function ranked() {
+  const key = state.by === "cost" ? (i) => i.cost.score : (i) => i.thread.event_count;
+  return [...state.items].sort((a, b) => key(b) - key(a) || b.cost.score - a.cost.score);
+}
+const costRank = (item) => state.items.indexOf(item) + 1;   // items arrive ranked by cost
+
+function renderHero() {
+  const card = $("hero-card");
+  const items = state.items;
+  if (!items.length) { card.replaceChildren(h("div", { class: "empty" }, "No threads for this application yet.")); return; }
+  const n = Math.min(3, items.length);
+  const totalCost = items.reduce((s, i) => s + i.cost.score, 0) || 1;
+  const totalEvents = items.reduce((s, i) => s + i.thread.event_count, 0) || 1;
+  const top = items.slice(0, n);
+  const costShare = Math.round(100 * top.reduce((s, i) => s + i.cost.score, 0) / totalCost);
+  const eventShare = Math.round(100 * top.reduce((s, i) => s + i.thread.event_count, 0) / totalEvents);
+  card.replaceChildren(h("div", { class: "hero" },
+    h("div", { class: "fig" }, costShare + "%"),
+    h("p", null, "of incident cost sits in the ", h("strong", null, `${n} costliest threads`),
+      ", which hold only ", h("strong", null, eventShare + "%"), ` of the ${totalEvents} events. Cost is not volume.`)));
+}
+
+function renderList() {
+  const list = $("list");
+  $("list-title").textContent = state.by === "cost" ? "Threads by cost" : "Threads by volume (event count)";
+  $("by-cost").setAttribute("aria-pressed", state.by === "cost");
+  $("by-volume").setAttribute("aria-pressed", state.by === "volume");
+  const maxCost = Math.max(...state.items.map((i) => i.cost.score), 1);
+  const maxEvents = Math.max(...state.items.map((i) => i.thread.event_count), 1);
+
+  list.replaceChildren(...ranked().map((item, idx) => {
+    const { thread: t, cost: c } = item;
+    const measure = (label, value, max, text, quiet) => h("div", { class: "measure" },
+      h("span", null, label),
+      h("span", { class: "track" },
+        h("span", { class: "bar" + (quiet ? " quiet" : ""), style: `width:${Math.max(1, 78 * value / max)}%` }),
+        h("span", { class: "val" }, text)));
+    const row = h("button", { class: "row", "aria-current": t.id === state.threadId ? "true" : null,
+                              onclick: () => selectThread(t.id) },
+      h("span", { class: "rank" }, idx + 1),
+      h("span", null,
+        h("span", { class: "title" }, t.title || "(untitled)"),
+        measure("Cost", c.score, maxCost, fmt(c.score)),
+        measure("Events", t.event_count, maxEvents, String(t.event_count), true),
+        h("span", { class: "chips" },
+          c.peak_severity && h("span", { class: "chip" },
+            h("i", { class: "sw", style: `background:var(--sev-${c.peak_severity})` }), "peak " + c.peak_severity),
+          state.by === "volume" && h("span", { class: "chip solid" }, `cost rank #${costRank(item)}`),
+          c.recurrences > 0 && h("span", { class: "chip solid" }, `↺ came back ×${c.recurrences}`),
+          c.still_live && h("span", { class: "chip" }, h("i", { class: "dot", style: "background:var(--warning)" }), "open, still accruing"),
+          h("span", { class: "chip" }, (t.source_types || []).map((s) => SRC[s] || s).join(" + ")),
+          item.has_eval_draft && h("span", { class: "chip" }, h("span", { class: "ok-ink" }, "✓"), "eval drafted"))));
+    return row;
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Right: cost working, the thread, the draft
+// ---------------------------------------------------------------------------
+function costCard(item) {
+  const { thread: t, cost: c } = item, w = state.weights;
+  const tile = (k, v, n, cls) => h("div", { class: "tile " + (cls || "") },
+    h("div", { class: "k" }, k), h("div", { class: "v" }, v), h("div", { class: "n" }, n));
+  const op = (s) => h("div", { class: "op", "aria-hidden": "true" }, s);
+
+  const formula = h("div", { class: "formula", role: "group", "aria-label": "How the cost is computed" },
+    tile("Exposure", fmt(c.exposure), `severity-days over ${days(c.live_days)} live`), op("×"),
+    tile("Reach", "×" + fmt(c.reach_multiplier, 2), `${c.people} ${c.people === 1 ? "person" : "people"} pulled in`), op("×"),
+    tile("Recurrence", "×" + fmt(c.recurrence_multiplier, 2), c.recurrences ? `came back ${c.recurrences}×` : "never came back"), op("+"),
+    tile("Effort", fmt(c.effort, 2), `${c.touches} human-written event${c.touches === 1 ? "" : "s"}`), op("="),
+    tile("Cost", fmt(c.score), "severity-days, scaled", "total"));
+
+  return h("div", { class: "card" },
+    h("h2", null, "Why it cost this much"),
+    h("h3", null, t.title || "(untitled)"),
+    h("div", { class: "sub", style: "margin-top:4px" },
+      `${t.state}${c.still_live ? " — cost is still accruing" : ""} · ${plural(t.event_count, "event")} · ` +
+      (t.source_types || []).map((s) => SRC[s] || s).join(" + ")),
+    formula,
+    h("div", { class: "sub" }, `A day live is weighted low ${w.severity.low} · medium ${w.severity.medium} · high ${w.severity.high} · critical ${w.severity.critical}. ` +
+      `Each extra person adds ${w.reach_per_person}; each recurrence adds ${w.recurrence_penalty}; each human-written event costs ${w.effort_per_touch}.`),
+    severityStrip(item));
+}
+
+function severityStrip(item) {
+  const c = item.cost, events = (state.story && state.story.events) || [];
+  const times = [...c.segments.flatMap((s) => [Date.parse(s.start), Date.parse(s.end)]),
+                 ...events.map((e) => Date.parse(e.occurred_at))];
+  if (!times.length) return null;
+  const t0 = Math.min(...times), t1 = Math.max(...times), span = Math.max(t1 - t0, 1);
+  const pct = (ms) => 100 * (ms - t0) / span;
+  const DAY = 86400000;
+
+  const strip = h("div", { class: "strip" }, h("div", { class: "base" }));
+  for (const s of c.segments) {
+    const left = pct(Date.parse(s.start)), width = pct(Date.parse(s.end)) - left;
+    const weight = state.weights.severity[s.severity] || state.weights.severity.low;
+    // 2px of surface between touching segments does the separating; no strokes.
+    strip.append(tipOn(h("div", { class: "segm", tabindex: "0",
+      style: `left:calc(${left}% + 1px);width:max(3px, calc(${width}% - 2px));background:var(--sev-${s.severity || "low"})` }),
+      `${fmt(weight * s.days)} severity-days`, `${s.severity || "unknown"} for ${days(s.days)} (${weight} per day)`));
+  }
+  for (const e of events) {
+    strip.append(tipOn(h("button", { class: "evdot", style: `left:${pct(Date.parse(e.occurred_at))}%`,
+      "aria-label": `${e.label}: ${e.title}`, onclick: () => flashEvent(e.id) }, h("i")),
+      `${e.label} · ${SRC[e.source_type] || e.source_type}${e.moved_to ? " · " + e.moved_to : ""}`, e.title));
+  }
+
+  const totalDays = span / DAY, ticks = h("div", { class: "ticks" });
+  const step = [1, 2, 5, 7, 14, 30].find((s) => totalDays / s <= 7) || 60;
+  for (let d = 0; d < totalDays - step * 0.4; d += step) ticks.append(h("span", { style: `left:${100 * d / totalDays}%` }, "day " + d));
+  ticks.append(h("span", { style: "left:100%" }, "day " + fmt(totalDays, 0)));
+
+  // The same reading in words, so nothing here is reachable only by hovering.
+  const parts = [];
+  c.segments.forEach((s, i) => {
+    const prev = c.segments[i - 1];
+    if (prev && Date.parse(s.start) - Date.parse(prev.end) > 60000) parts.push(`resolved for ${days((Date.parse(s.start) - Date.parse(prev.end)) / DAY)}`);
+    parts.push(`${s.severity || "unknown"} for ${days(s.days)}`);
+  });
+  parts.push(c.still_live ? "still open" : "resolved");
+
+  return h("div", { class: "strip-wrap" },
+    strip, ticks,
+    h("div", { class: "legend" },
+      ...SEVERITIES.map((s) => h("span", null, h("i", { class: "sw", style: `background:var(--sev-${s})` }), s)),
+      h("span", null, h("i", { class: "gapkey" }), "resolved (no cost)"),
+      h("span", null, h("i", { class: "dot", style: "background:var(--ink-2)" }), "event")),
+    h("div", { class: "reading" }, parts.join(" → ")));
+}
+
+function eventsCard() {
+  const events = state.story.events;
+  return h("div", { class: "card thread", id: "thread-card" },
+    h("h2", null, `The thread · ${plural(events.length, "event")}`),
+    ...events.map((e) => h("div", { class: "ev", id: "ev-" + e.id },
+      h("div", { class: "ev-head" },
+        h("span", { class: "lbl" }, e.label), h("span", { class: "src" }, SRC[e.source_type] || e.source_type),
+        e.source_id && e.source_type !== "email" && h("span", null, e.source_id),
+        h("span", null, new Date(e.occurred_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })),
+        e.who && h("span", null, e.who),
+        e.moved_to && h("span", { class: "chip solid" }, e.moved_to)),
+      h("div", { class: "ev-title" }, e.title || ""),
+      h("div", { class: "ev-body" + (e.source_type === "splunk" ? " machine" : ""), "data-body": "1" }, e.body || ""))));
+}
+
+// Wrap the first occurrence of `quote` inside the element's text in a <mark>, by
+// splitting text nodes — the event text never passes through innerHTML.
+function markQuote(root, quote) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const at = node.nodeValue.toLowerCase().indexOf(quote.toLowerCase());
+    if (at < 0) continue;
+    const hit = node.splitText(at); hit.splitText(quote.length);
+    const mark = document.createElement("mark"); hit.replaceWith(mark); mark.append(hit);
+    return mark;
+  }
+  return null;
+}
+function flashEvent(eventId, quote) {
+  const el = $("ev-" + eventId);
+  if (!el) return;
+  document.querySelectorAll("mark").forEach((m) => m.replaceWith(...m.childNodes));
+  el.normalize();
+  const mark = quote ? markQuote(el, quote) : null;
+  const target = mark || el, box = $("thread-card");
+  if (box && box.scrollHeight > box.clientHeight + 1) {
+    // The thread panel scrolls on its own: move it, and leave the page where the reader is.
+    const y = target.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    box.scrollTo({ top: y - box.clientHeight / 3, behavior: "smooth" });
+    if (box.getBoundingClientRect().top < 0) box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } else {
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+}
+
+function draftCard(item) {
+  const d = state.story.eval_draft;
+  const card = h("div", { class: "card" }, h("h2", null, "Eval case draft"));
+  if (!d) {
+    put(card,
+      h("div", { class: "empty" }, "No draft yet. The thread already holds most of an eval case: what the application was asked, what it answered, and — from whoever verified the fix — what it should have said."),
+      state.error && h("div", { class: "err" }, state.error));
+    return card;
+  }
+  const field = (k, ...body) => h("div", { class: "field" }, h("div", { class: "k" }, k), ...body);
+  const list = (items, render) => h("ul", { class: "plain" }, ...items.map((i) => h("li", null, render(i))));
+  const verified = d.evidence.filter((e) => e.verified).length;
+
+  put(card,
+    h("h3", null, d.title),
+    h("div", { class: "chips" },
+      h("span", { class: "chip solid" }, d.failure_mode),
+      h("span", { class: "chip" }, d.eval_type.replace("_", " ")),
+      d.regression && tipOn(h("span", { class: "chip solid", tabindex: "0" }, "↺ regression test"),
+        "Set by the thread's ledger, not the model", "This story was resolved and came back."),
+      d.stale && h("span", { class: "chip" }, h("i", { class: "dot", style: "background:var(--warning)" }), "stale — thread has changed")),
+    h("p", { style: "margin:10px 0 0;color:var(--ink-2)" }, d.summary),
+
+    (d.input.setup || d.input.user_message) && field("Input",
+      d.input.setup && h("div", { class: "sub", style: "margin-bottom:6px" }, "Setup: " + d.input.setup),
+      d.input.user_message && h("div", { class: "quote" }, d.input.user_message)),
+    d.observed_output && field("✕ Observed in production", h("div", { class: "quote bad" }, d.observed_output)),
+    field("✓ Expected behaviour", h("div", { class: "quote ok" }, d.expected_behavior)),
+
+    d.pass_criteria.length > 0 && field("Pass criteria",
+      h("ul", { class: "plain" }, ...d.pass_criteria.map((c) =>
+        h("li", null, h("span", { class: "grader" }, c.grader), h("span", null, c.check))))),
+    d.rerun_on.length > 0 && field("Re-run after", h("div", { class: "chips", style: "margin-top:0" },
+      ...d.rerun_on.map((r) => h("span", { class: "chip" }, r)))),
+    d.variants.length > 0 && field("Variants to widen coverage", list(d.variants, (v) => v)),
+    d.gaps.length > 0 && field("The author still has to supply", list(d.gaps, (g) => g)),
+
+    field(`Evidence · ${verified} of ${d.evidence.length} quotes found in the event they cite`,
+      h("div", null, ...d.evidence.map((e) => h("button", { class: "evi", onclick: () => flashEvent(e.signal_event_id, e.quote) },
+        h("q", null, e.quote),
+        h("span", { class: "meta" },
+          h("span", { class: "lbl" }, e.event), h("span", { class: "src" }, SRC[e.source_type] || e.source_type),
+          h("span", null, "supports " + e.supports.replace("_", " ")),
+          e.verified ? h("span", { class: "ok-ink" }, "✓ verified")
+                     : h("span", { class: "warn-ink" }, "⚠ not found in that event")))))),
+
+    h("div", { class: "foot" },
+      h("span", null, `${d.model} · ${new Date(d.generated_at).toLocaleString()}`),
+      h("span", { class: "spacer" }),
+      h("button", { onclick: (ev) => copyDraft(ev.currentTarget, d) }, "Copy as JSON"),
+      ),
+    state.error && h("div", { class: "err" }, state.error));
+  return card;
+}
+
+async function copyDraft(btn, d) {
+  try { await navigator.clipboard.writeText(JSON.stringify(d, null, 2)); btn.textContent = "Copied"; }
+  catch (_) { btn.textContent = "Copy failed"; }
+  setTimeout(() => { btn.textContent = "Copy as JSON"; }, 1500);
+}
+
+function renderDetail() {
+  const detail = $("detail");
+  const item = state.items.find((i) => i.thread.id === state.threadId);
+  if (!item || !state.story) { detail.replaceChildren(h("div", { class: "card empty" }, "Pick a thread.")); return; }
+  detail.replaceChildren(costCard(item), h("div", { class: "two" }, eventsCard(), draftCard(item)));
+}
+
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
+async function selectThread(id) {
+  state.threadId = id; state.error = null; writeHash(); renderList();
+  $("detail").classList.add("loading");          // hold the frame while loading
+  try {
+    const story = await api(`/threads/${id}`);
+    if (id !== state.threadId) return;
+    state.story = story;
+  } catch (e) { state.story = null; state.error = e.message; }
+  $("detail").classList.remove("loading");
+  renderDetail();
+}
+
+async function loadSoftware(id, keepThread) {
+  state.softwareId = id; $("software").value = id;
+  $("left").classList.add("loading");
+  const data = await api(`/threads?software_id=${id}`);
+  $("left").classList.remove("loading");
+  state.items = data.items; state.weights = data.weights;
+  renderHero(); renderList();
+  const wanted = keepThread && state.items.find((i) => i.thread.id === keepThread);
+  if (wanted || state.items.length) await selectThread((wanted || state.items[0]).thread.id);
+  else { state.threadId = null; state.story = null; writeHash(); renderDetail(); }
+}
+
+async function init() {
+  const hash = readHash();
+  if (hash.by === "volume") state.by = "volume";
+  state.software = (await api("/software")).items;
+  const select = $("software");
+  select.replaceChildren(...state.software.map((s) =>
+    h("option", { value: s.id }, `${s.software_name} — ${s.company_name} (${s.threads} threads)`)));
+  select.addEventListener("change", () => loadSoftware(select.value));
+  for (const by of ["cost", "volume"]) $("by-" + by).addEventListener("click", () => { state.by = by; writeHash(); renderList(); });
+  if (!state.software.length) { $("hero-card").replaceChildren(h("div", { class: "empty" }, "No software with threads. Seed one: scripts/seed_ai_app_scenario.py")); return; }
+  const start = state.software.find((s) => s.id === hash.software) || state.software[0];
+  await loadSoftware(start.id, hash.thread);
+}
+init().catch((e) => { $("hero-card").replaceChildren(h("div", { class: "err" }, "Could not load: " + e.message)); });
+</script>
+</body>
+</html>
