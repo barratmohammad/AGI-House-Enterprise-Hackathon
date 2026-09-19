@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Throughline — Instrument</title>
+<meta name="description" content="Throughline turns scattered incident reports into priced stories, and the costliest into eval cases.">
+<style>
+  /* ── Direction 04 · INSTRUMENT ────────────────────────────────────────────
+     The product as measuring equipment. A faint graticule under everything,
+     tick marks, tabular figures, small precise type. The hero is not a slogan
+     but a reading: the costliest incident's actual severity trace, including
+     the gap where it was resolved and the spike where it came back. */
+  :root {
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --sunk:#f0efec;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --hair:#e1e0d9; --axis:#c3c2b7;
+    --acc:#2a78d6; --quiet:#c3c2b7;
+    --sev-low:#86b6ef; --sev-medium:#3987e5; --sev-high:#1c5cab; --sev-critical:#0d366b;
+    --good:#006300; --critical:#d03b3b; --warning:#fab219;
+    --grid: rgba(11,11,11,.045);
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page:#0d0d0d; --surface:#1a1a19; --sunk:#242422;
+      --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+      --hair:#2c2c2a; --axis:#383835;
+      --acc:#3987e5; --quiet:#52514e;
+      --sev-low:#184f95; --sev-medium:#2a78d6; --sev-high:#6da7ec; --sev-critical:#b7d3f6;
+      --good:#0ca30c; --grid: rgba(255,255,255,.04);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --sunk:#242422;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --hair:#2c2c2a; --axis:#383835;
+    --acc:#3987e5; --quiet:#52514e;
+    --sev-low:#184f95; --sev-medium:#2a78d6; --sev-high:#6da7ec; --sev-critical:#b7d3f6;
+    --good:#0ca30c; --grid: rgba(255,255,255,.04);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; color:var(--ink); font:14px/1.6 var(--sans);
+         background:var(--page);
+         background-image:linear-gradient(var(--grid) 1px, transparent 1px),
+                          linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+         background-size:22px 22px; }
+  .wrap { max-width:1140px; margin:0 auto; padding:0 24px; }
+  .mono { font-family:var(--mono); font-variant-numeric:tabular-nums; }
+  .lab { font:600 10px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+
+  header { border-bottom:1px solid var(--axis); background:var(--page); position:sticky; top:0; z-index:6; }
+  header .wrap { display:flex; align-items:center; gap:16px; padding:11px 24px; flex-wrap:wrap; }
+  .mark { font-size:16px; font-weight:700; letter-spacing:-.02em; display:flex; align-items:center; gap:8px; }
+  .mark .gl { width:13px; height:13px; border:1.5px solid var(--acc); border-radius:50%; position:relative; flex:none; }
+  .mark .gl::before, .mark .gl::after { content:""; position:absolute; background:var(--acc); }
+  .mark .gl::before { left:50%; top:-4px; bottom:-4px; width:1.5px; transform:translateX(-50%); }
+  .mark .gl::after  { top:50%; left:-4px; right:-4px; height:1.5px; transform:translateY(-50%); }
+  header .sp { flex:1; }
+  header .rd { display:flex; gap:20px; }
+  header .rd div { text-align:right; }
+  header .rd .v { font:600 13px/1.2 var(--mono); font-variant-numeric:tabular-nums; }
+
+  /* Hero */
+  .hero { padding:46px 0 34px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.02fr); gap:46px; align-items:center; }
+  @media (max-width:940px){ .hero{ grid-template-columns:1fr; gap:32px; padding-bottom:26px; } }
+  h1 { font-size:clamp(30px,4.3vw,47px); line-height:1.08; letter-spacing:-.03em; margin:12px 0 16px; font-weight:700; }
+  h1 em { font-style:normal; color:var(--acc); }
+  .hero p { font-size:16px; line-height:1.6; color:var(--ink-2); margin:0; max-width:52ch; }
+
+  /* The reading — a bordered instrument panel */
+  .inst { background:var(--surface); border:1px solid var(--axis); border-radius:4px; padding:16px 18px 14px;
+          box-shadow:0 1px 0 var(--hair); }
+  .inst .top { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:3px; }
+  .inst .ttl { font-size:13.5px; font-weight:700; letter-spacing:-.01em; }
+  .inst .cap { font-size:11.5px; color:var(--muted); margin:0 0 18px; }
+
+  .strip { position:relative; height:52px; }
+  .strip .base { position:absolute; left:0; right:0; top:36px; height:1px; background:var(--axis); }
+  .seg { position:absolute; top:22px; height:14px; border-radius:2px; }
+  .dot { position:absolute; top:2px; width:22px; height:22px; margin-left:-11px; display:grid; place-items:center; }
+  .dot i { width:8px; height:8px; border-radius:50%; background:var(--ink-2); box-shadow:0 0 0 2px var(--surface); display:block; }
+  .dot.big i { width:10px; height:10px; background:var(--critical); }
+  .ticks { position:relative; height:15px; }
+  .ticks span { position:absolute; transform:translateX(-50%); font:10.5px/1 var(--mono); color:var(--muted); }
+  .ticks span:first-child { transform:none; } .ticks span:last-child { transform:translateX(-100%); }
+  .anns { position:relative; height:34px; margin-top:2px; }
+  .ann { position:absolute; font:10px/1.35 var(--mono); color:var(--ink-2); transform:translateX(-50%);
+         text-align:center; width:64px; }
+  .ann b { color:var(--ink); display:block; }
+  .legend { display:flex; flex-wrap:wrap; gap:13px; font-size:11.5px; color:var(--ink-2); margin-top:12px;
+            padding-top:11px; border-top:1px solid var(--hair); }
+  .legend span { display:inline-flex; align-items:center; gap:5px; }
+  .sw { width:10px; height:10px; border-radius:2px; flex:none; display:block; }
+  .gapkey { width:15px; height:1px; background:var(--axis); display:block; }
+  .reading { font:11.5px/1.55 var(--mono); color:var(--ink-2); margin-top:9px; }
+
+  /* Readout row */
+  .readouts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; background:var(--hair);
+              border:1px solid var(--axis); border-radius:4px; overflow:hidden; margin-bottom:46px; }
+  @media (max-width:760px){ .readouts{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  .ro { background:var(--surface); padding:14px 16px; }
+  .ro .v { font:700 27px/1.15 var(--sans); letter-spacing:-.025em; }
+  .ro .k { font:11.5px/1.35 var(--sans); color:var(--muted); margin-top:2px; }
+
+  section { padding:46px 0; border-top:1px solid var(--hair); }
+  h2 { font:600 10px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:0 0 18px; }
+  h3 { font-size:23px; line-height:1.2; letter-spacing:-.02em; margin:0 0 12px; font-weight:700; }
+  p.b { font-size:15px; line-height:1.62; color:var(--ink-2); margin:0 0 12px; max-width:66ch; }
+  p.b b { color:var(--ink); font-weight:600; }
+
+  .g3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+  @media (max-width:880px){ .g3{ grid-template-columns:1fr; } }
+  .panel { background:var(--surface); border:1px solid var(--hair); border-radius:4px; padding:16px 17px 18px; }
+  .panel .n { font:600 10px/1 var(--mono); letter-spacing:.14em; color:var(--acc); margin-bottom:9px; }
+  .panel h4 { font-size:15px; margin:0 0 8px; font-weight:700; letter-spacing:-.01em; }
+  .panel p { font-size:13.5px; line-height:1.6; color:var(--ink-2); margin:0; }
+
+  /* Two ranked charts */
+  .two { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+  @media (max-width:880px){ .two{ grid-template-columns:1fr; } }
+  .row { display:grid; grid-template-columns:18px minmax(0,1fr) 46px; gap:0 9px; align-items:center;
+         padding:6px 0; border-top:1px solid var(--hair); }
+  .row:first-of-type { border-top:1px solid var(--axis); }
+  .row .rk { font:11px/1 var(--mono); color:var(--muted); }
+  .row .nm { font-size:12.5px; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .vl { font:600 12.5px/1 var(--mono); text-align:right; }
+  .row .tr { grid-column:2 / -1; margin-top:4px; }
+  .row .bar{ display:block; height:9px; border-radius:0 4px 4px 0; background:var(--acc); min-width:2px; }
+  .row .bar.q { background:var(--quiet); }
+  .row.on { background:var(--sunk); margin:0 -9px; padding:6px 9px; }
+  .row.on .nm { color:var(--ink); font-weight:600; }
+  .say { font:11.5px/1.55 var(--mono); color:var(--ink-2); margin:14px 0 0; padding-left:10px; border-left:2px solid var(--axis); }
+  .say b { color:var(--ink); }
+
+  /* Spec sheet for the eval case */
+  .spec { background:var(--surface); border:1px solid var(--axis); border-radius:4px; overflow:hidden; }
+  .spec .hd { padding:13px 17px; border-bottom:1px solid var(--hair); display:flex; gap:9px; flex-wrap:wrap; align-items:center; }
+  .spec .hd .t { font-size:15px; font-weight:700; letter-spacing:-.01em; }
+  .tag { font:600 10.5px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase; border:1px solid var(--axis);
+         border-radius:3px; padding:4px 7px; color:var(--ink-2); }
+  .tag.fill { background:var(--sunk); border-color:transparent; }
+  .kv { display:grid; grid-template-columns:124px minmax(0,1fr); gap:14px; padding:11px 17px; border-top:1px solid var(--hair); }
+  @media (max-width:620px){ .kv{ grid-template-columns:1fr; gap:4px; } }
+  .kv .k { font:600 10px/1.5 var(--mono); letter-spacing:.13em; text-transform:uppercase; color:var(--muted); }
+  .kv .v { font:13px/1.6 var(--mono); }
+  .kv .v.bad { color:var(--critical); } .kv .v.ok { color:var(--good); }
+  .crit { display:grid; grid-template-columns:120px minmax(0,1fr); gap:8px 12px; font:12.5px/1.6 var(--mono); }
+  .crit .g { color:var(--muted); }
+
+  .btns { display:flex; gap:11px; flex-wrap:wrap; margin-top:22px; }
+  .btn { font:600 13.5px/1 var(--sans); padding:13px 20px; border-radius:4px; text-decoration:none;
+         background:var(--acc); color:#fff; border:1px solid var(--acc); }
+  .btn.g { background:none; color:var(--ink); border-color:var(--axis); }
+  footer { border-top:1px solid var(--hair); padding:20px 0 40px; font:11.5px/1.7 var(--mono); color:var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="mark"><span class="gl"></span>Throughline</span>
+    <span class="sp"></span>
+    <span class="rd">
+      <div><span class="lab">Threads</span><div class="v">8</div></div>
+      <div><span class="lab">Events</span><div class="v">42</div></div>
+      <div><span class="lab">Sources</span><div class="v">3</div></div>
+      <div><span class="lab">Verified</span><div class="v" style="color:var(--good)">62/62</div></div>
+    </span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <div>
+      <span class="lab">Eval prioritisation · instrumented</span>
+      <h1>Measure what your failures actually <em>cost.</em></h1>
+      <p>Reports about your AI application arrive in Jira, in email and in monitoring, and are joined
+         up nowhere. Throughline stitches them into one story per incident, takes a reading on each,
+         and drafts the eval case for the ones that measure highest.</p>
+    </div>
+
+    <div class="inst">
+      <div class="top"><span class="ttl">Thread 1 · severity trace</span><span class="tag">cost 271.8</span></div>
+      <p class="cap">Returns window: assistant quoted 30 days after the policy moved to 45</p>
+
+      <div class="strip" id="strip"><div class="base"></div></div>
+      <div class="ticks" id="ticks"></div>
+      <div class="anns" id="anns"></div>
+
+      <div class="legend">
+        <span><i class="sw" style="background:var(--sev-low)"></i>low</span>
+        <span><i class="sw" style="background:var(--sev-medium)"></i>medium</span>
+        <span><i class="sw" style="background:var(--sev-high)"></i>high</span>
+        <span><i class="sw" style="background:var(--sev-critical)"></i>critical</span>
+        <span><i class="gapkey"></i>resolved — costs nothing</span>
+      </div>
+      <div class="reading" id="reading"></div>
+    </div>
+  </div>
+
+  <div class="readouts">
+    <div class="ro"><div class="v">72%</div><div class="k">of cost in 3 of 8 threads</div></div>
+    <div class="ro"><div class="v">33%</div><div class="k">of reports in those same 3</div></div>
+    <div class="ro"><div class="v">17.5×</div><div class="k">costliest vs loudest thread</div></div>
+    <div class="ro"><div class="v">1</div><div class="k">thread still accruing</div></div>
+  </div>
+
+  <section>
+    <h2>Method</h2>
+    <h3>Three instruments, in series</h3>
+    <div class="g3" style="margin-top:22px">
+      <div class="panel">
+        <div class="n">01 — STITCH</div>
+        <h4>Joined on certainty</h4>
+        <p>Same ticket number, same email chain, same alert refiring — merged automatically. Merely
+           similar gets proposed by a judge and confirmed by a person. Nothing merges on a guess.</p>
+      </div>
+      <div class="panel">
+        <div class="n">02 — PRICE</div>
+        <h4>Exposure × reach × recurrence + effort</h4>
+        <p>A live day counts 1 at low severity and 8 at critical. Resolved days cost nothing. Every
+           person pulled in widens it; a fix that failed and came back multiplies it.</p>
+      </div>
+      <div class="panel">
+        <div class="n">03 — DRAFT</div>
+        <h4>Grounded, then checked</h4>
+        <p>The thread already holds the input, the wrong answer and the right one. The model drafts
+           the case; every quote it cites is looked up in the event it claims to come from.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Calibration</h2>
+    <h3>Cost is not volume</h3>
+    <p class="b">The same eight threads, ranked twice. Two measures on two scales get two charts —
+       collapsing them onto one axis is the mistake this instrument exists to correct.</p>
+    <div class="two" style="margin-top:24px">
+      <div class="panel">
+        <div class="top" style="margin-bottom:2px"><span class="ttl">Ranked by cost</span></div>
+        <p class="cap">severity-days, scaled</p>
+        <div id="t-cost"></div>
+        <p class="say">Top thread was fixed, then <b>came back after a vendor upgrade</b>.</p>
+      </div>
+      <div class="panel">
+        <div class="top" style="margin-bottom:2px"><span class="ttl">Ranked by volume</span></div>
+        <p class="cap">reports filed</p>
+        <div id="t-vol"></div>
+        <p class="say">Markdown formatting drew <b>12 reports</b> and ranks <b>7th of 8</b> by cost.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Output</h2>
+    <h3>Thread 1, as an eval case</h3>
+    <div class="spec" style="margin-top:20px">
+      <div class="hd">
+        <span class="t">Returns window retrieval after policy change</span>
+        <span class="tag fill">stale retrieval</span><span class="tag">tool_use</span><span class="tag fill">↺ regression</span>
+      </div>
+      <div class="kv"><div class="k">Input</div><div class="v">How long do I have to return shoes?</div></div>
+      <div class="kv"><div class="k">Observed</div><div class="v bad">You have 30 days from delivery.</div></div>
+      <div class="kv"><div class="k">Expected</div><div class="v ok">Answer states '45 days from delivery' and is sourced from the live version of KB-1180, not the archived copy.</div></div>
+      <div class="kv"><div class="k">Pass criteria</div><div class="crit">
+        <span class="g">contains</span><span>"45 days"</span>
+        <span class="g">not_contains</span><span>"30 days"</span>
+        <span class="g">tool_call</span><span>retrieval returns live KB-1180, not archived</span>
+        <span class="g">llm_judge</span><span>answer does not hedge between two windows</span>
+      </div></div>
+      <div class="kv"><div class="k">Re-run after</div><div>
+        <span class="tag">embedding model upgrade</span> <span class="tag">KB re-index</span>
+        <span class="tag">retrieval config change</span> <span class="tag">vendor release</span></div></div>
+      <div class="kv"><div class="k">Evidence</div><div class="v" style="color:var(--ink-2)">
+        <span style="color:var(--good)">✓</span> 11 of 11 cited quotes found in the event they cite.
+        The regression label is set by thread history, not model opinion.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Limits</h2>
+    <h3>Some readings are not eval cases</h3>
+    <p class="b">Thread 8 is a run of latency alerts — a real incident with a real cost, but not a test
+       of anything the assistant <b>said</b>. Throughline drafts a threshold check and states the
+       limitation instead of inventing a prompt. An instrument that never reads zero is broken.</p>
+    <div class="btns">
+      <a class="btn" href="../dashboard/index.html">Open the dashboard</a>
+      <a class="btn g" href="./index.html">Other directions</a>
+    </div>
+  </section>
+
+  <footer>
+    Throughline · demo build. "Helix Assist" at "Meridian Retail" is fictional — every person, ticket,
+    policy and number is invented. Snapshot: 8 threads, 42 events, 3 sources.
+  </footer>
+</div>
+
+<script>
+// ---- Hero trace: thread 1's real segments, 14 live days across a 22-day span ----
+const SPAN = 22;
+const SEGMENTS = [
+  { at:0.0,  days:6.0, sev:"high"     },   // opened, agents turning away valid returns
+  { at:11.0, days:3.0, sev:"high"     },   // came back after the embedding upgrade
+  { at:14.0, days:5.0, sev:"critical" },   // escalated during peak returns week
+];
+const MARKS = [
+  { at:0.0,  label:"opened",    big:false, note:["HX-18", "raised"] },
+  { at:6.0,  label:"resolved",  big:false, note:["fix", "shipped"] },
+  { at:11.0, label:"recurring", big:true,  note:["vendor", "upgrade"] },
+  { at:14.0, label:"escalated", big:true,  note:["peak", "week"] },
+  { at:19.0, label:"resolved",  big:false, note:["fix", "shipped"] },
+];
+const W = { low:1, medium:2, high:4, critical:8 };
+
+(function trace() {
+  const strip = document.getElementById("strip");
+  const pct = (d) => 100 * d / SPAN;
+  for (const s of SEGMENTS) {
+    const el = document.createElement("div");
+    el.className = "seg";
+    el.style.cssText = "left:calc(" + pct(s.at) + "% + 1px);width:max(4px,calc(" + pct(s.days) +
+                       "% - 2px));background:var(--sev-" + s.sev + ")";
+    el.title = s.sev + " for " + s.days + " days — " + (W[s.sev] * s.days) + " severity-days";
+    strip.append(el);
+  }
+  for (const m of MARKS) {
+    const el = document.createElement("div");
+    el.className = "dot" + (m.big ? " big" : "");
+    el.style.left = pct(m.at) + "%";
+    el.title = m.label;
+    el.append(document.createElement("i"));
+    strip.append(el);
+  }
+  const ticks = document.getElementById("ticks");
+  for (let d = 0; d <= SPAN; d += 7) {
+    const s = document.createElement("span");
+    s.style.left = pct(d) + "%"; s.textContent = "day " + d;
+    ticks.append(s);
+  }
+  const anns = document.getElementById("anns");
+  for (const m of MARKS) {
+    const a = document.createElement("div");
+    a.className = "ann"; a.style.left = pct(m.at) + "%";
+    const b = document.createElement("b"); b.textContent = m.note[0];
+    a.append(b, document.createTextNode(m.note[1]));
+    anns.append(a);
+  }
+  const total = SEGMENTS.reduce((s, x) => s + W[x.sev] * x.days, 0);
+  document.getElementById("reading").textContent =
+    "high 6d → resolved 5d → high 3d → critical 5d → resolved   ·   " +
+    total.toFixed(0) + " severity-days exposure over 14 live days";
+})();
+
+// ---- The two ranked charts ----
+const THREADS = [
+  { t:"Returns window: 30 vs 45 days",   cost:271.75, ev:7  },
+  { t:"Cross-case data leak",            cost:90.75, ev:3  },
+  { t:"Fabricated policy clause",        cost:73.0,  ev:4  },
+  { t:"Order lookup unavailable",        cost:71.0,  ev:6  },
+  { t:"Refunds refused as advice",       cost:45.86, ev:3  },
+  { t:"Injected 100% refund code",       cost:30.75, ev:4  },
+  { t:"Markdown in plain-text channels", cost:15.5,  ev:12 },
+  { t:"draft_reply latency p95",         cost:10.0,  ev:3  },
+];
+const HILITE = new Set(["Returns window: 30 vs 45 days","Markdown in plain-text channels"]);
+function table(el, rows, key, fmt, quiet) {
+  const max = Math.max(...rows.map(key));
+  rows.forEach((d, i) => {
+    const row = document.createElement("div");
+    row.className = "row" + (HILITE.has(d.t) ? " on" : "");
+    row.innerHTML =
+      '<span class="rk">' + (i + 1) + '</span><span class="nm"></span>' +
+      '<span class="vl">' + fmt(key(d)) + '</span>' +
+      '<span class="tr"><span class="bar' + (quiet ? " q" : "") +
+        '" style="width:' + Math.max(1.5, 100 * key(d) / max) + '%"></span></span>';
+    row.querySelector(".nm").textContent = d.t;
+    row.title = d.t + " — cost " + d.cost + ", " + d.ev + " reports";
+    el.append(row);
+  });
+}
+table(document.getElementById("t-cost"),
+      [...THREADS].sort((a,b)=>b.cost-a.cost), d=>d.cost, v=>v.toFixed(v%1?1:0), false);
+table(document.getElementById("t-vol"),
+      [...THREADS].sort((a,b)=>b.ev-a.ev||b.cost-a.cost), d=>d.ev, v=>String(v), true);
+</script>
+</body>
+</html>

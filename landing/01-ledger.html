@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Throughline — Ledger</title>
+<meta name="description" content="Throughline turns scattered incident reports into priced stories, and the costliest into eval cases.">
+<style>
+  /* ── Direction 01 · LEDGER ────────────────────────────────────────────────
+     An audit memo. Warm paper, a serif that means business, hairline rules,
+     figures that line up in columns. The argument is financial, so the page
+     is set like a financial page. Colour is almost absent; it appears only
+     where a number needs to be believed. */
+  :root {
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --sunk:#f0efec;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --hair:#e1e0d9; --rule:#c3c2b7;
+    --series:#2a78d6; --quiet:#c3c2b7;
+    --sev-low:#86b6ef; --sev-medium:#3987e5; --sev-high:#1c5cab; --sev-critical:#0d366b;
+    --critical:#d03b3b; --good:#006300; --warning:#fab219;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page:#0d0d0d; --surface:#1a1a19; --sunk:#242422;
+      --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+      --hair:#2c2c2a; --rule:#383835;
+      --series:#3987e5; --quiet:#52514e;
+      --sev-low:#184f95; --sev-medium:#2a78d6; --sev-high:#6da7ec; --sev-critical:#b7d3f6;
+      --good:#0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --sunk:#242422;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --hair:#2c2c2a; --rule:#383835;
+    --series:#3987e5; --quiet:#52514e;
+    --sev-low:#184f95; --sev-medium:#2a78d6; --sev-high:#6da7ec; --sev-critical:#b7d3f6;
+    --good:#0ca30c;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font:16px/1.6 var(--serif); }
+  .wrap { max-width:1080px; margin:0 auto; padding:0 24px; }
+  a { color:inherit; }
+
+  /* Masthead */
+  .mast { border-bottom:2px solid var(--ink); }
+  .mast .wrap { display:flex; align-items:baseline; gap:16px; padding:18px 24px 12px; flex-wrap:wrap; }
+  .word { font-size:30px; letter-spacing:-.02em; font-weight:600; }
+  .word b { font-weight:600; border-bottom:3px solid var(--series); padding-bottom:1px; }
+  .kicker { font:600 11px/1 var(--sans); letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  .mast .spacer { flex:1; }
+  .mast nav { font:13px/1 var(--sans); color:var(--ink-2); display:flex; gap:18px; }
+
+  /* Lede */
+  .lede { border-bottom:1px solid var(--rule); padding:44px 0 34px; }
+  .lede h1 { font-size:clamp(34px,5.2vw,58px); line-height:1.08; margin:0 0 18px; font-weight:600; letter-spacing:-.022em; max-width:17ch; }
+  .lede h1 em { font-style:italic; color:var(--ink-2); }
+  .standfirst { font-size:19px; line-height:1.55; color:var(--ink-2); max-width:58ch; margin:0; }
+  .byline { font:600 11px/1 var(--sans); letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+            margin-bottom:20px; display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+  .byline i { width:4px; height:4px; border-radius:50%; background:var(--rule); display:inline-block; font-style:normal; }
+
+  /* The pull figure — the one number the whole memo rests on */
+  .figure { display:grid; grid-template-columns:auto minmax(0,1fr); gap:28px; align-items:center;
+            margin-top:34px; padding:22px 0 0; border-top:1px solid var(--hair); }
+  .figure .n { font:600 76px/1 var(--sans); letter-spacing:-.03em; }
+  .figure p { margin:0; font-size:17px; line-height:1.5; color:var(--ink-2); max-width:44ch; }
+  .figure p strong { color:var(--ink); font-weight:600; }
+  @media (max-width:640px){ .figure{ grid-template-columns:1fr; gap:10px; } .figure .n{ font-size:60px; } }
+
+  /* Section furniture */
+  section { padding:52px 0; border-bottom:1px solid var(--hair); }
+  h2 { font:600 11px/1 var(--sans); letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:0 0 22px; }
+  h3 { font-size:25px; line-height:1.22; margin:0 0 10px; font-weight:600; letter-spacing:-.012em; }
+  p.body { font-size:16.5px; line-height:1.62; color:var(--ink-2); margin:0 0 14px; max-width:62ch; }
+  p.body strong { color:var(--ink); font-weight:600; }
+
+  /* Three columns of argument */
+  .three { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:30px; }
+  @media (max-width:860px){ .three{ grid-template-columns:1fr; gap:28px; } }
+  .step { border-top:2px solid var(--ink); padding-top:14px; }
+  .step .num { font:600 11px/1 var(--sans); letter-spacing:.12em; color:var(--muted); margin-bottom:10px; }
+  .step p { font-size:15.5px; line-height:1.58; color:var(--ink-2); margin:0; }
+
+  /* Ranked tables — two measures, two scales, two tables. Never one axis shared. */
+  .tables { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:34px; }
+  @media (max-width:860px){ .tables{ grid-template-columns:1fr; gap:30px; } }
+  .tbl h4 { font:600 13px/1.4 var(--sans); margin:0 0 3px; }
+  .tbl .cap { font:12.5px/1.45 var(--sans); color:var(--muted); margin:0 0 14px; }
+  .r { display:grid; grid-template-columns:18px minmax(0,1fr) 46px; gap:0 10px; align-items:center;
+       padding:7px 0; border-top:1px solid var(--hair); font:var(--sans); }
+  .r:first-of-type { border-top:1px solid var(--rule); }
+  .r .rk { font:12px/1 var(--sans); color:var(--muted); font-variant-numeric:tabular-nums; }
+  .r .nm { font:13.5px/1.35 var(--sans); color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .r .vl { font:600 13px/1 var(--sans); text-align:right; font-variant-numeric:tabular-nums; }
+  .r .track { grid-column:2 / -1; height:9px; margin-top:5px; }
+  .r .bar { display:block; height:9px; border-radius:0 4px 4px 0; background:var(--series); min-width:2px; }
+  .r .bar.q { background:var(--quiet); }
+  .r.on { background:var(--sunk); box-shadow:inset 3px 0 0 var(--ink); margin:0 -8px; padding:7px 8px; }
+  .r.on .nm { color:var(--ink); font-weight:600; }
+  .flip { font:12.5px/1.5 var(--sans); color:var(--ink-2); margin:16px 0 0; padding-left:12px;
+          border-left:2px solid var(--rule); }
+  .flip b { color:var(--ink); }
+
+  /* The cost formula, set like an equation in a report */
+  .eq { display:flex; flex-wrap:wrap; align-items:stretch; gap:10px; margin:0 0 16px; }
+  .eq .t { border:1px solid var(--rule); padding:10px 14px; min-width:116px; background:var(--surface); }
+  .eq .t .k { font:600 10.5px/1 var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  .eq .t .v { font:600 25px/1.25 var(--sans); letter-spacing:-.02em; }
+  .eq .t .n { font:11.5px/1.35 var(--sans); color:var(--muted); }
+  .eq .t.tot { border:2px solid var(--ink); }
+  .eq .op { align-self:center; font:400 19px/1 var(--sans); color:var(--muted); }
+
+  /* Evidence card */
+  .ev { background:var(--surface); border:1px solid var(--hair); padding:22px 24px; }
+  .ev .lbl { font:600 10.5px/1 var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+  .q { font:13px/1.55 var(--mono); background:var(--sunk); padding:10px 12px; margin:0 0 14px; white-space:pre-wrap; }
+  .q.bad { box-shadow:inset 3px 0 0 var(--critical); }
+  .q.ok  { box-shadow:inset 3px 0 0 var(--good); }
+  .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .chip { font:12px/1 var(--sans); color:var(--ink-2); border:1px solid var(--hair); border-radius:999px; padding:5px 10px; }
+  .chip.solid { background:var(--sunk); border-color:transparent; }
+  .chip .tick { color:var(--good); font-weight:700; }
+
+  .two-col { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); gap:38px; align-items:start; }
+  @media (max-width:860px){ .two-col{ grid-template-columns:1fr; gap:28px; } }
+
+  /* Close */
+  .close { padding:54px 0 64px; border-bottom:0; }
+  .close h3 { font-size:30px; max-width:20ch; }
+  .btn { display:inline-block; font:600 14px/1 var(--sans); padding:13px 22px; border:2px solid var(--ink);
+         background:var(--ink); color:var(--page); text-decoration:none; }
+  .btn.ghost { background:none; color:var(--ink); }
+  .btns { display:flex; gap:12px; flex-wrap:wrap; margin-top:22px; }
+  footer { font:12.5px/1.6 var(--sans); color:var(--muted); padding:22px 0 40px; border-top:1px solid var(--hair); }
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <div>
+      <div class="kicker">Eval prioritisation</div>
+      <div class="word">Through<b>line</b></div>
+    </div>
+    <div class="spacer"></div>
+    <nav>
+      <span>The method</span><span>The ledger</span><span>The case</span>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="lede">
+    <div class="byline">
+      <span>Incident review</span><i></i><span>Helix Assist · Meridian Retail</span><i></i><span>8 threads · 42 events</span>
+    </div>
+    <h1>Your evals are written from failures you <em>imagined.</em></h1>
+    <p class="standfirst">
+      The ones that actually happened are sitting in Jira, in three email chains and in an
+      alert nobody connected to either. Throughline stitches them into one story per incident,
+      works out what each one cost, and drafts the eval case for the ones that cost the most.
+    </p>
+
+    <div class="figure">
+      <div class="n">72%</div>
+      <p>of incident cost sits in the <strong>3 costliest threads</strong> — which hold only
+         <strong>33%</strong> of the 42 reports. The loudest problem in this dataset is the
+         seventh most expensive. <strong>Cost is not volume.</strong></p>
+    </div>
+  </div>
+
+  <section>
+    <h2>The method</h2>
+    <div class="three">
+      <div class="step">
+        <div class="num">01 — Stitch</div>
+        <h3>Reports become threads</h3>
+        <p>A Jira ticket, four emails and a Splunk alert are one incident. Throughline joins them
+           automatically only when it is certain — same ticket number, same email chain, same alert
+           refiring. When it is merely likely, a judge proposes and a human decides. Nothing merges
+           on a guess.</p>
+      </div>
+      <div class="step">
+        <div class="num">02 — Price</div>
+        <h3>Threads get a cost</h3>
+        <p>Each day an incident stayed live counts for more the worse it was. Every extra person
+           pulled in widens it. A fix that failed and came back multiplies it. Counting tickets tells
+           you how loud a problem was; this tells you what it cost.</p>
+      </div>
+      <div class="step">
+        <div class="num">03 — Draft</div>
+        <h3>Cost becomes an eval case</h3>
+        <p>A thread already records what the assistant was asked, what it wrongly said, and — from
+           whoever verified the fix — what it should have said. That is an eval case. The model drafts
+           it; every quote it cites is checked against the event it came from.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The ledger</h2>
+    <h3 style="margin-bottom:6px">Rank the same eight threads twice and they barely agree</h3>
+    <p class="body">Two measures, two scales, two tables — the comparison is the point, so neither is
+       flattened onto the other's axis.</p>
+
+    <div class="tables" style="margin-top:26px">
+      <div class="tbl">
+        <h4>Ranked by cost</h4>
+        <p class="cap">Severity-days, scaled for reach, recurrence and effort</p>
+        <div id="t-cost"></div>
+        <p class="flip">The returns-window thread was fixed, then <b>came back after a vendor
+           upgrade</b>. Paying for the same fix twice makes it 17.5× the cost of the noisiest thread.</p>
+      </div>
+      <div class="tbl">
+        <h4>Ranked by volume</h4>
+        <p class="cap">Number of reports filed, all sources</p>
+        <div id="t-vol"></div>
+        <p class="flip">Markdown in plain-text replies drew <b>12 reports</b> — more than any other
+           thread — and ranks <b>7th of 8</b> by cost. It was mild and fixed in five days.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The arithmetic</h2>
+    <div class="two-col">
+      <div>
+        <h3>A score you can take apart</h3>
+        <p class="body">Every figure on this page decomposes. Below is the costliest thread in the
+           demo — a returns policy that changed from 30 days to 45, where the assistant kept citing
+           the archived article.</p>
+        <div class="eq">
+          <div class="t"><div class="k">Exposure</div><div class="v">80.0</div><div class="n">severity-days over 14 live</div></div>
+          <div class="op">×</div>
+          <div class="t"><div class="k">Reach</div><div class="v">2.25</div><div class="n">6 people pulled in</div></div>
+          <div class="op">×</div>
+          <div class="t"><div class="k">Recurrence</div><div class="v">1.50</div><div class="n">came back once</div></div>
+          <div class="op">+</div>
+          <div class="t"><div class="k">Effort</div><div class="v">1.75</div><div class="n">7 human-written events</div></div>
+          <div class="op">=</div>
+          <div class="t tot"><div class="k">Cost</div><div class="v">271.8</div><div class="n">severity-days, scaled</div></div>
+        </div>
+        <p class="body" style="font-size:14.5px">A live day counts 1 at low severity, 2 at medium,
+           4 at high, 8 at critical. Days spent resolved cost nothing. Automated alerts are not effort —
+           only what a person had to write.</p>
+      </div>
+
+      <div class="ev">
+        <div class="lbl">Drafted eval case</div>
+        <h3 style="font-size:20px">Returns window retrieval after policy change</h3>
+        <div class="meta" style="margin:8px 0 16px">
+          <span class="chip solid">stale retrieval</span>
+          <span class="chip">tool use</span>
+          <span class="chip solid">↺ regression test</span>
+        </div>
+        <div class="lbl">Input</div>
+        <div class="q">How long do I have to return shoes?</div>
+        <div class="lbl">✕ Observed in production</div>
+        <div class="q bad">You have 30 days from delivery.</div>
+        <div class="lbl">✓ Expected</div>
+        <div class="q ok">Answer states '45 days from delivery' and is sourced from the live version of KB-1180, not the archived copy.</div>
+        <div class="lbl">Evidence</div>
+        <div class="meta">
+          <span class="chip"><span class="tick">✓</span> 11 of 11 quotes found in the event they cite</span>
+        </div>
+        <p class="body" style="font-size:13.5px; margin:14px 0 0">
+          The regression label is not the model's opinion — it is set by the thread's own history,
+          which shows the problem was resolved and returned. The draft then names what should trigger
+          a re-run: embedding model upgrade, knowledge base re-index, vendor platform release.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="close">
+    <h2>What it is not</h2>
+    <h3>Some threads are not about the model's answers at all.</h3>
+    <p class="body">A run of latency alerts is a real incident and a real cost, but it is not a test
+       case about what the assistant said. Throughline says so, and drafts a threshold check instead
+       of inventing a prompt. A tool that always finds an eval is a tool you cannot trust.</p>
+    <div class="btns">
+      <a class="btn" href="../dashboard/index.html">Open the dashboard</a>
+      <a class="btn ghost" href="./index.html">See the other directions</a>
+    </div>
+  </div>
+
+  <footer>
+    Throughline · demo build. Helix Assist, Meridian Retail and every person, ticket and number in
+    this scenario are invented. Snapshot of 8 threads and 42 events across Jira, email and Splunk.
+  </footer>
+</div>
+
+<script>
+// The eight threads, verbatim from the demo snapshot.
+const THREADS = [
+  { t:"Returns window: 30 days quoted, 45 correct", cost:271.75, ev:7  },
+  { t:"Cross-case data leak in handover summary",   cost:90.75, ev:3  },
+  { t:"Fabricated 'Platinum 90-day' policy clause", cost:73.0,  ev:4  },
+  { t:"Order lookup reported unavailable",          cost:71.0,  ev:6  },
+  { t:"Refunds over $500 refused as advice",        cost:45.86, ev:3  },
+  { t:"Injected email triggered 100% refund code",  cost:30.75, ev:4  },
+  { t:"Markdown in plain-text channels",            cost:15.5,  ev:12 },
+  { t:"draft_reply latency p95 > 12s",              cost:10.0,  ev:3  },
+];
+const HILITE = new Set(["Returns window: 30 days quoted, 45 correct","Markdown in plain-text channels"]);
+
+function table(el, rows, key, fmt, quiet) {
+  const max = Math.max(...rows.map(key));
+  el.innerHTML = "";
+  rows.forEach((d, i) => {
+    const on = HILITE.has(d.t) ? " on" : "";
+    const row = document.createElement("div");
+    row.className = "r" + on;
+    row.innerHTML =
+      '<span class="rk">' + (i + 1) + '</span>' +
+      '<span class="nm"></span>' +
+      '<span class="vl">' + fmt(key(d)) + '</span>' +
+      '<span class="track"><span class="bar' + (quiet ? " q" : "") +
+        '" style="width:' + Math.max(1.5, 100 * key(d) / max) + '%"></span></span>';
+    row.querySelector(".nm").textContent = d.t;           // text as text, always
+    row.title = d.t + " — cost " + d.cost + ", " + d.ev + " reports";
+    el.append(row);
+  });
+}
+table(document.getElementById("t-cost"),
+      [...THREADS].sort((a,b)=>b.cost-a.cost), d=>d.cost, v=>v.toFixed(v%1?1:0), false);
+table(document.getElementById("t-vol"),
+      [...THREADS].sort((a,b)=>b.ev-a.ev||b.cost-a.cost), d=>d.ev, v=>String(v), true);
+</script>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Throughline — Terminal</title>
+<meta name="description" content="Throughline turns scattered incident reports into priced stories, and the costliest into eval cases.">
+<style>
+  /* ── Direction 02 · TERMINAL ──────────────────────────────────────────────
+     For the engineer who owns the eval suite. Monospace throughout, dark by
+     default, the hero is a real command with real output. Colour is used the
+     way a good CLI uses it: sparingly, and always meaning something. */
+  :root {
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --sunk:#242422; --raised:#2c2c2a;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --hair:#2c2c2a; --rule:#383835;
+    --series:#3987e5; --quiet:#52514e;
+    --sev-low:#184f95; --sev-medium:#2a78d6; --sev-high:#6da7ec; --sev-critical:#b7d3f6;
+    --good:#0ca30c; --warning:#fab219; --critical:#d03b3b; --serious:#ec835a;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --sunk:#f0efec; --raised:#e1e0d9;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --hair:#e1e0d9; --rule:#c3c2b7;
+    --series:#2a78d6; --quiet:#c3c2b7;
+    --sev-low:#86b6ef; --sev-medium:#3987e5; --sev-high:#1c5cab; --sev-critical:#0d366b;
+    --good:#006300;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink-2);
+         font:14px/1.65 var(--mono); -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1000px; margin:0 auto; padding:0 24px; }
+  .dim { color:var(--muted); }
+  .hi  { color:var(--ink); }
+  .blue{ color:var(--series); }
+  .grn { color:var(--good); }
+  .amb { color:var(--warning); }
+  .red { color:var(--critical); }
+
+  /* Top bar */
+  header { border-bottom:1px solid var(--hair); position:sticky; top:0; background:var(--page); z-index:5; }
+  header .wrap { display:flex; align-items:center; gap:14px; padding:12px 24px; flex-wrap:wrap; }
+  .logo { font-size:15px; color:var(--ink); font-weight:700; letter-spacing:-.01em; }
+  .logo span { color:var(--series); }
+  .v { font-size:11.5px; color:var(--muted); border:1px solid var(--rule); border-radius:3px; padding:1px 6px; }
+  header .sp { flex:1; }
+  header a { color:var(--ink-2); text-decoration:none; font-size:13px; }
+  header a:hover { color:var(--ink); }
+
+  /* Hero */
+  .hero { padding:60px 0 46px; }
+  .hero h1 { font-size:clamp(26px,4.2vw,42px); line-height:1.22; color:var(--ink); margin:0 0 18px;
+             font-weight:700; letter-spacing:-.02em; max-width:24ch; }
+  .hero h1 u { text-decoration:none; border-bottom:2px solid var(--series); }
+  .hero p { font-size:15px; line-height:1.7; max-width:66ch; margin:0 0 26px; }
+
+  /* Terminal window */
+  .term { background:var(--surface); border:1px solid var(--rule); border-radius:8px; overflow:hidden;
+          box-shadow:0 18px 44px rgba(0,0,0,.34); }
+  .term .bar { display:flex; align-items:center; gap:7px; padding:9px 13px; background:var(--sunk);
+               border-bottom:1px solid var(--rule); }
+  .term .bar i { width:10px; height:10px; border-radius:50%; background:var(--rule); display:block; }
+  .term .bar .t { margin-left:8px; font-size:11.5px; color:var(--muted); }
+  .term pre { margin:0; padding:16px 18px; font:13px/1.7 var(--mono); white-space:pre; overflow-x:auto;
+              -webkit-overflow-scrolling:touch; }
+  .term pre b { color:var(--ink); font-weight:700; }
+
+  /* Sections */
+  section { padding:48px 0; border-top:1px solid var(--hair); }
+  h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+       margin:0 0 20px; font-weight:700; }
+  h3 { font-size:19px; line-height:1.3; color:var(--ink); margin:0 0 10px; font-weight:700; letter-spacing:-.01em; }
+  p.b { font-size:14px; line-height:1.72; max-width:70ch; margin:0 0 12px; }
+  p.b b { color:var(--ink); font-weight:700; }
+
+  .grid3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  @media (max-width:840px){ .grid3{ grid-template-columns:1fr; } }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:8px; padding:18px 18px 20px; }
+  .card .tag { font-size:11.5px; color:var(--series); margin-bottom:9px; }
+  .card h3 { font-size:15.5px; margin-bottom:8px; }
+  .card p { font-size:13.5px; line-height:1.66; margin:0; }
+
+  /* Stat strip */
+  .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; background:var(--hair);
+           border:1px solid var(--hair); border-radius:8px; overflow:hidden; }
+  @media (max-width:760px){ .stats{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  .stat { background:var(--surface); padding:17px 16px; }
+  .stat .n { font-size:27px; line-height:1.2; color:var(--ink); font-weight:700; letter-spacing:-.02em; }
+  .stat .k { font-size:12px; color:var(--muted); margin-top:3px; }
+
+  /* Ranked bars — two tables, two scales */
+  .two { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:26px; }
+  @media (max-width:840px){ .two{ grid-template-columns:1fr; } }
+  .panel { background:var(--surface); border:1px solid var(--hair); border-radius:8px; padding:16px 18px 18px; }
+  .panel h4 { font-size:13px; color:var(--ink); margin:0 0 2px; font-weight:700; }
+  .panel .cap { font-size:11.5px; color:var(--muted); margin:0 0 14px; }
+  .row { display:grid; grid-template-columns:16px minmax(0,1fr) 44px; gap:0 8px; align-items:center;
+         padding:6px 0; border-top:1px solid var(--hair); }
+  .row:first-of-type { border-top:0; }
+  .row .rk { font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .row .nm { font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .vl { font-size:12.5px; color:var(--ink); text-align:right; font-variant-numeric:tabular-nums; }
+  .row .tr { grid-column:2 / -1; margin-top:4px; }
+  .row .bar { display:block; height:8px; border-radius:0 4px 4px 0; background:var(--series); min-width:2px; }
+  .row .bar.q { background:var(--quiet); }
+  .row.on { background:var(--sunk); margin:0 -8px; padding:6px 8px; border-radius:4px; }
+  .row.on .nm { color:var(--ink); font-weight:700; }
+  .note { font-size:12px; line-height:1.6; color:var(--muted); margin:14px 0 0; padding-left:10px;
+          border-left:2px solid var(--rule); }
+  .note b { color:var(--ink-2); }
+
+  /* Eval case as a diff */
+  .diff { background:var(--surface); border:1px solid var(--hair); border-radius:8px; overflow:hidden; }
+  .diff .h { padding:12px 16px; border-bottom:1px solid var(--hair); background:var(--sunk);
+             display:flex; gap:10px; flex-wrap:wrap; align-items:center; font-size:12px; }
+  .diff .h .nm { color:var(--ink); font-weight:700; font-size:13px; }
+  .pill { font-size:11px; border:1px solid var(--rule); border-radius:999px; padding:2px 8px; color:var(--ink-2); }
+  .diff pre { margin:0; padding:14px 16px; font:12.5px/1.75 var(--mono); white-space:pre-wrap; }
+  .diff .minus { color:var(--critical); }
+  .diff .plus  { color:var(--good); }
+  .diff .f { padding:11px 16px; border-top:1px solid var(--hair); font-size:12px; color:var(--muted);
+             display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+  /* Close */
+  .cta { display:flex; gap:12px; flex-wrap:wrap; margin-top:22px; }
+  .btn { display:inline-block; font:700 13px/1 var(--mono); padding:12px 18px; border-radius:6px;
+         text-decoration:none; border:1px solid var(--series); background:var(--series); color:#fff; }
+  .btn.g { background:none; color:var(--ink); border-color:var(--rule); }
+  .btn:hover { filter:brightness(1.08); }
+  footer { border-top:1px solid var(--hair); padding:20px 0 40px; font-size:12px; color:var(--muted); line-height:1.7; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="logo">through<span>line</span></span>
+    <span class="v">v0.1.0 · demo</span>
+    <span class="sp"></span>
+    <a href="#method">method</a>
+    <a href="#ledger">ledger</a>
+    <a href="../dashboard/index.html">dashboard →</a>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <h1>Write the evals for failures that <u>already happened.</u></h1>
+    <p>Reports about your AI application land in Jira, in email and in your monitoring — never in one
+       place, never joined up. Throughline stitches them into one story per incident, prices each
+       story, and drafts the eval case for the ones worth the most.</p>
+
+    <div class="term">
+      <div class="bar"><i></i><i></i><i></i><span class="t">throughline — rank</span></div>
+<pre><span class="grn">$</span> <b>throughline rank --app helix-assist --by cost</b>
+
+<span class="dim">stitched 42 events from 3 sources (jira, email, splunk) → 8 threads</span>
+
+<span class="dim">  #   COST    REPORTS  PEAK       THREAD</span>
+  <span class="blue">1</span>   <b>271.8</b>   7        <span class="red">critical</span>   Returns window: 30 days quoted, 45 correct  <span class="amb">↺ recurred</span>
+  <span class="blue">2</span>   <b> 90.8</b>   3        <span class="red">critical</span>   Cross-case data leak in handover summary
+  <span class="blue">3</span>   <b> 73.0</b>   4        high       Fabricated 'Platinum 90-day' policy clause
+  <span class="dim">4    71.0   6        critical   Order lookup reported unavailable
+  5    45.9   3        medium     Refunds over $500 refused as advice      ● open
+  6    30.8   4        critical   Injected email triggered 100% refund code
+  7    15.5  <b class="amb">12</b>        low        Markdown in plain-text channels
+  8    10.0   3        high       draft_reply latency p95 &gt; 12s</span>
+
+<span class="dim">  72% of cost in the top 3 threads, which hold 33% of the reports.</span>
+<span class="dim">  loudest thread (12 reports) ranks 7th. cost is not volume.</span>
+
+<span class="grn">$</span> <b>throughline draft 1 --verify-quotes</b>
+<span class="grn">✓</span> <span class="dim">eval case drafted · 11/11 cited quotes found in source events</span>
+<span class="grn">✓</span> <span class="dim">labelled regression — thread history shows resolved → recurring</span>
+</pre>
+    </div>
+  </div>
+
+  <section>
+    <h2>The snapshot</h2>
+    <div class="stats">
+      <div class="stat"><div class="n">8</div><div class="k">threads stitched</div></div>
+      <div class="stat"><div class="n">42</div><div class="k">reports, 3 sources</div></div>
+      <div class="stat"><div class="n">17.5×</div><div class="k">costliest vs loudest</div></div>
+      <div class="stat"><div class="n">62/62</div><div class="k">quotes verified</div></div>
+    </div>
+  </section>
+
+  <section id="method">
+    <h2>How it works</h2>
+    <div class="grid3">
+      <div class="card">
+        <div class="tag">01 · stitch</div>
+        <h3>Joined on certainty, not similarity</h3>
+        <p>Same ticket number, same email chain, same alert refiring — those merge automatically. An
+           alert and a ticket that merely <i>describe</i> the same fault get proposed by a judge and
+           confirmed by a person. Nothing merges on a guess.</p>
+      </div>
+      <div class="card">
+        <div class="tag">02 · price</div>
+        <h3>Exposure × reach × recurrence + effort</h3>
+        <p>A live day counts 1 at low severity and 8 at critical; resolved days cost nothing. Each
+           person pulled in adds 0.25. A fix that failed and came back multiplies the whole thing.
+           Alerts aren't effort — only what a human wrote.</p>
+      </div>
+      <div class="card">
+        <div class="tag">03 · draft</div>
+        <h3>Grounded in the thread, then checked</h3>
+        <p>Input, observed output, expected behaviour, pass criteria with a grader each, variants, and
+           an explicit list of what you still have to supply. Every cited quote is looked up in the
+           event it claims to come from.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="ledger">
+    <h2>Cost is not volume</h2>
+    <h3>Rank the same eight threads twice</h3>
+    <p class="b">Two measures on two different scales, so they get two charts. Flattening them onto one
+       axis would be the whole mistake this product exists to fix.</p>
+    <div class="two" style="margin-top:22px">
+      <div class="panel">
+        <h4>Ranked by cost</h4>
+        <p class="cap">severity-days, scaled</p>
+        <div id="t-cost"></div>
+        <p class="note">The top thread was fixed and <b>came back after a vendor upgrade</b> — paying
+           for the same fix twice.</p>
+      </div>
+      <div class="panel">
+        <h4>Ranked by volume</h4>
+        <p class="cap">reports filed</p>
+        <div id="t-vol"></div>
+        <p class="note">Markdown formatting drew <b>12 reports</b>, the most of any thread, and ranks
+           <b>7th of 8</b> by cost.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Output</h2>
+    <h3>The costliest thread, as an eval case</h3>
+    <p class="b">A returns policy moved from 30 days to 45. The assistant kept retrieving the archived
+       article — then started doing it again after an embedding model upgrade rebuilt the index.</p>
+    <div class="diff" style="margin-top:20px">
+      <div class="h">
+        <span class="nm">returns_window_retrieval_after_policy_change</span>
+        <span class="pill">stale retrieval</span>
+        <span class="pill">tool_use</span>
+        <span class="pill">↺ regression</span>
+      </div>
+<pre><span class="dim">input:</span>    How long do I have to return shoes?
+
+<span class="minus">- observed  You have 30 days from delivery.</span>
+<span class="plus">+ expected  Answer states '45 days from delivery' and is sourced from
++           the live version of KB-1180, not the archived copy.</span>
+
+<span class="dim">pass_criteria:</span>
+  <span class="dim">contains      </span> "45 days"
+  <span class="dim">not_contains  </span> "30 days"
+  <span class="dim">tool_call     </span> retrieval returns live KB-1180, not archived
+  <span class="dim">llm_judge     </span> answer does not hedge between two windows
+
+<span class="dim">rerun_on:</span> embedding model upgrade · knowledge base re-index ·
+          retrieval configuration change · vendor platform release</pre>
+      <div class="f"><span class="grn">✓</span> 11 of 11 cited quotes found in the event they cite
+        <span class="pill">claude-sonnet-4-5</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Honesty</h2>
+    <h3>Sometimes the answer is "this isn't an eval case"</h3>
+    <p class="b">Thread 8 is a run of latency alerts. It is a real incident with a real cost, but it is
+       not a test of anything the assistant <i>said</i>. Throughline drafts a threshold check and says
+       so, rather than inventing a prompt. <b>A tool that always finds an eval is a tool you can't
+       trust.</b></p>
+    <div class="cta">
+      <a class="btn" href="../dashboard/index.html">Open the dashboard</a>
+      <a class="btn g" href="./index.html">Other directions</a>
+    </div>
+  </section>
+
+  <footer>
+    Throughline · demo build. "Helix Assist" at "Meridian Retail" is a fictional scenario — every
+    person, ticket, policy and number is invented. 8 threads, 42 events, 3 sources.
+  </footer>
+</div>
+
+<script>
+const THREADS = [
+  { t:"Returns window: 30 vs 45 days",        cost:271.75, ev:7  },
+  { t:"Cross-case data leak",                 cost:90.75, ev:3  },
+  { t:"Fabricated policy clause",             cost:73.0,  ev:4  },
+  { t:"Order lookup unavailable",             cost:71.0,  ev:6  },
+  { t:"Refunds refused as advice",            cost:45.86, ev:3  },
+  { t:"Injected 100% refund code",            cost:30.75, ev:4  },
+  { t:"Markdown in plain-text channels",      cost:15.5,  ev:12 },
+  { t:"draft_reply latency p95",              cost:10.0,  ev:3  },
+];
+const HILITE = new Set(["Returns window: 30 vs 45 days","Markdown in plain-text channels"]);
+
+function table(el, rows, key, fmt, quiet) {
+  const max = Math.max(...rows.map(key));
+  rows.forEach((d, i) => {
+    const row = document.createElement("div");
+    row.className = "row" + (HILITE.has(d.t) ? " on" : "");
+    row.innerHTML =
+      '<span class="rk">' + (i + 1) + '</span><span class="nm"></span>' +
+      '<span class="vl">' + fmt(key(d)) + '</span>' +
+      '<span class="tr"><span class="bar' + (quiet ? " q" : "") +
+        '" style="width:' + Math.max(1.5, 100 * key(d) / max) + '%"></span></span>';
+    row.querySelector(".nm").textContent = d.t;
+    row.title = d.t + " — cost " + d.cost + ", " + d.ev + " reports";
+    el.append(row);
+  });
+}
+table(document.getElementById("t-cost"),
+      [...THREADS].sort((a,b)=>b.cost-a.cost), d=>d.cost, v=>v.toFixed(v%1?1:0), false);
+table(document.getElementById("t-vol"),
+      [...THREADS].sort((a,b)=>b.ev-a.ev||b.cost-a.cost), d=>d.ev, v=>String(v), true);
+</script>
+</body>
+</html>

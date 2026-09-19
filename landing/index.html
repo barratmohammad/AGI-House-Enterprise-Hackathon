@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Throughline — Five directions</title>
+<meta name="description" content="Five landing page directions for Throughline. Pick one.">
+<style>
+  :root {
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --sunk:#f0efec;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --hair:#e1e0d9; --axis:#c3c2b7; --acc:#2a78d6;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page:#0d0d0d; --surface:#1a1a19; --sunk:#242422;
+      --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+      --hair:#2c2c2a; --axis:#383835; --acc:#3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --sunk:#242422;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --hair:#2c2c2a; --axis:#383835; --acc:#3987e5;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font:15px/1.6 var(--sans); }
+  .wrap { max-width:1100px; margin:0 auto; padding:0 24px; }
+  .lab { font:600 10.5px/1 var(--mono); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+
+  header { padding:38px 0 26px; border-bottom:1px solid var(--hair); }
+  h1 { font-size:clamp(28px,4vw,42px); line-height:1.1; letter-spacing:-.03em; margin:12px 0 12px; font-weight:700; }
+  h1 s { text-decoration:none; color:var(--acc); }
+  header p { font-size:16.5px; color:var(--ink-2); margin:0; max-width:66ch; }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:20px; padding:32px 0 10px; }
+  a.card { display:block; background:var(--surface); border:1px solid var(--hair); border-radius:12px;
+           overflow:hidden; text-decoration:none; color:inherit; transition:border-color .14s, transform .14s; }
+  a.card:hover { border-color:var(--acc); transform:translateY(-2px); }
+  a.card .shot { display:block; width:100%; aspect-ratio:16/10; object-fit:cover; object-position:top center;
+                 background:var(--sunk); border-bottom:1px solid var(--hair); }
+  a.card .meta { padding:15px 17px 17px; }
+  a.card .n { font:600 10.5px/1 var(--mono); letter-spacing:.14em; color:var(--acc); }
+  a.card h2 { font-size:18px; letter-spacing:-.02em; margin:8px 0 6px; font-weight:700; }
+  a.card p { font-size:13.5px; line-height:1.55; color:var(--ink-2); margin:0; }
+
+  .foot { border-top:1px solid var(--hair); margin-top:28px; padding:22px 0 46px;
+          display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .btn { font:600 13.5px/1 var(--sans); padding:12px 19px; border-radius:7px; text-decoration:none;
+         background:var(--ink); color:var(--page); border:1px solid var(--ink); }
+  .btn.g { background:none; color:var(--ink); border-color:var(--axis); }
+  .foot .note { font-size:12.5px; color:var(--muted); margin-left:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="lab">Five directions · pick one</span>
+    <h1>Through<s>line</s></h1>
+    <p>One product, five visual arguments. Every page carries the same facts from the same snapshot —
+      8 threads, 42 events, the cost model and one drafted eval case — so the only variable is the
+      design. Click any card to open the live page.</p>
+  </header>
+
+  <div class="grid">
+    <a class="card" href="./01-ledger.html">
+      <img class="shot" src="../renders/01-ledger.png" alt="Ledger direction, rendered">
+      <div class="meta">
+        <div class="n">01</div>
+        <h2>Ledger</h2>
+        <p>An audit memo. Warm paper, serif headlines, hairline rules, figures set in columns. The
+          argument is financial, so the page is set like a financial page.</p>
+      </div>
+    </a>
+    <a class="card" href="./02-terminal.html">
+      <img class="shot" src="../renders/02-terminal.png" alt="Terminal direction, rendered">
+      <div class="meta">
+        <div class="n">02</div>
+        <h2>Terminal</h2>
+        <p>For the engineer who owns the eval suite. Monospace throughout, dark by default, and the
+          hero is a real command with real output rather than a slogan.</p>
+      </div>
+    </a>
+    <a class="card" href="./03-swiss.html">
+      <img class="shot" src="../renders/03-swiss.png" alt="Swiss direction, rendered">
+      <div class="meta">
+        <div class="n">03</div>
+        <h2>Swiss</h2>
+        <p>Maximum confidence, minimum furniture. A visible twelve-column grid, type set very large and
+          very tight, hairlines doing all the dividing, exactly one colour.</p>
+      </div>
+    </a>
+    <a class="card" href="./04-instrument.html">
+      <img class="shot" src="../renders/04-instrument.png" alt="Instrument direction, rendered">
+      <div class="meta">
+        <div class="n">04</div>
+        <h2>Instrument</h2>
+        <p>The product as measuring equipment. A faint graticule under everything, and a hero that is
+          not a slogan but a reading — the costliest incident's real severity trace.</p>
+      </div>
+    </a>
+    <a class="card" href="./05-signal.html">
+      <img class="shot" src="../renders/05-signal.png" alt="Signal direction, rendered">
+      <div class="meta">
+        <div class="n">05</div>
+        <h2>Signal</h2>
+        <p>The one built to be projected. Dark, one luminous accent, very large type, and the single
+          argument staged as the centrepiece instead of buried in a section.</p>
+      </div>
+    </a>
+  </div>
+
+  <div class="foot">
+    <a class="btn" href="../dashboard/index.html">Open the dashboard</a>
+    <a class="btn g" href="../renders/">Renders folder</a>
+    <span class="note">Fictional demo data. Every person, ticket, policy and number is invented.</span>
+  </div>
+</div>
+</body>
+</html>
