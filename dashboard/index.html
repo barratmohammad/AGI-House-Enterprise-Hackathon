@@ -196,6 +196,9 @@
 <div id="tip" role="tooltip"></div>
 
 <script src="data.js"></script>
+<!-- Stage demo. Inert unless the URL carries #demo=1. Must load before the
+     main script, which rewrites the URL during init. -->
+<script src="demo.js"></script>
 <script>
 const SEVERITIES = ["low", "medium", "high", "critical"];
 const state = { software: [], softwareId: null, items: [], weights: null, by: "cost",
@@ -320,6 +323,7 @@ function renderList() {
           c.still_live && h("span", { class: "chip" }, h("i", { class: "dot", style: "background:var(--warning)" }), "open, still accruing"),
           h("span", { class: "chip" }, (t.source_types || []).map((s) => SRC[s] || s).join(" + ")),
           item.has_eval_draft && h("span", { class: "chip" }, h("span", { class: "ok-ink" }, "✓"), "eval drafted"))));
+    row.dataset.threadId = t.id;   // stable handle so a re-rank can be animated
     return row;
   }));
 }

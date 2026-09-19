@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Throughline — Terminal</title>
-<meta name="description" content="Throughline turns scattered incident reports into priced stories, and the costliest into eval cases.">
+<title>Swiss — Terminal</title>
+<meta name="description" content="Swiss turns scattered incident reports into priced stories, and the costliest into eval cases.">
 <style>
   /* ── Direction 02 · TERMINAL ──────────────────────────────────────────────
      For the engineer who owns the eval suite. Monospace throughout, dark by
@@ -137,7 +137,7 @@
 
 <header>
   <div class="wrap">
-    <span class="logo">through<span>line</span></span>
+    <span class="logo">swiss<span>_</span></span>
     <span class="v">v0.1.0 · demo</span>
     <span class="sp"></span>
     <a href="#method">method</a>
@@ -151,12 +151,12 @@
   <div class="hero">
     <h1>Write the evals for failures that <u>already happened.</u></h1>
     <p>Reports about your AI application land in Jira, in email and in your monitoring — never in one
-       place, never joined up. Throughline stitches them into one story per incident, prices each
+       place, never joined up. Swiss stitches them into one story per incident, prices each
        story, and drafts the eval case for the ones worth the most.</p>
 
     <div class="term">
-      <div class="bar"><i></i><i></i><i></i><span class="t">throughline — rank</span></div>
-<pre><span class="grn">$</span> <b>throughline rank --app helix-assist --by cost</b>
+      <div class="bar"><i></i><i></i><i></i><span class="t">swiss — rank</span></div>
+<pre><span class="grn">$</span> <b>swiss rank --app helix-assist --by cost</b>
 
 <span class="dim">stitched 42 events from 3 sources (jira, email, splunk) → 8 threads</span>
 
@@ -173,7 +173,7 @@
 <span class="dim">  72% of cost in the top 3 threads, which hold 33% of the reports.</span>
 <span class="dim">  loudest thread (12 reports) ranks 7th. cost is not volume.</span>
 
-<span class="grn">$</span> <b>throughline draft 1 --verify-quotes</b>
+<span class="grn">$</span> <b>swiss draft 1 --verify-quotes</b>
 <span class="grn">✓</span> <span class="dim">eval case drafted · 11/11 cited quotes found in source events</span>
 <span class="grn">✓</span> <span class="dim">labelled regression — thread history shows resolved → recurring</span>
 </pre>
@@ -275,7 +275,7 @@
     <h2>Honesty</h2>
     <h3>Sometimes the answer is "this isn't an eval case"</h3>
     <p class="b">Thread 8 is a run of latency alerts. It is a real incident with a real cost, but it is
-       not a test of anything the assistant <i>said</i>. Throughline drafts a threshold check and says
+       not a test of anything the assistant <i>said</i>. Swiss drafts a threshold check and says
        so, rather than inventing a prompt. <b>A tool that always finds an eval is a tool you can't
        trust.</b></p>
     <div class="cta">
@@ -285,7 +285,7 @@
   </section>
 
   <footer>
-    Throughline · demo build. "Helix Assist" at "Meridian Retail" is a fictional scenario — every
+    Swiss · demo build. "Helix Assist" at "Meridian Retail" is a fictional scenario — every
     person, ticket, policy and number is invented. 8 threads, 42 events, 3 sources.
   </footer>
 </div>

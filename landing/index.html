@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Throughline — Five directions</title>
-<meta name="description" content="Five landing page directions for Throughline. Pick one.">
+<title>Swiss — Five directions</title>
+<meta name="description" content="Five landing page directions for Swiss. Pick one.">
 <style>
   :root {
     color-scheme: light;
@@ -35,7 +35,11 @@
 
   header { padding:38px 0 26px; border-bottom:1px solid var(--hair); }
   h1 { font-size:clamp(28px,4vw,42px); line-height:1.1; letter-spacing:-.03em; margin:12px 0 12px; font-weight:700; }
-  h1 s { text-decoration:none; color:var(--acc); }
+  h1 { display:flex; align-items:center; gap:13px; }
+  h1 .gl { width:26px; height:26px; border:2px solid var(--acc); border-radius:50%; position:relative; flex:none; }
+  h1 .gl::before, h1 .gl::after { content:""; position:absolute; background:var(--acc); }
+  h1 .gl::before { left:50%; top:-8px; bottom:-8px; width:2px; transform:translateX(-50%); }
+  h1 .gl::after  { top:50%; left:-8px; right:-8px; height:2px; transform:translateY(-50%); }
   header p { font-size:16.5px; color:var(--ink-2); margin:0; max-width:66ch; }
 
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:20px; padding:32px 0 10px; }
@@ -61,7 +65,7 @@
 <div class="wrap">
   <header>
     <span class="lab">Five directions · pick one</span>
-    <h1>Through<s>line</s></h1>
+    <h1><span class="gl"></span>Swiss</h1>
     <p>One product, five visual arguments. Every page carries the same facts from the same snapshot —
       8 threads, 42 events, the cost model and one drafted eval case — so the only variable is the
       design. Click any card to open the live page.</p>
@@ -86,11 +90,11 @@
           hero is a real command with real output rather than a slogan.</p>
       </div>
     </a>
-    <a class="card" href="./03-swiss.html">
-      <img class="shot" src="../renders/03-swiss.png" alt="Swiss direction, rendered">
+    <a class="card" href="./03-international.html">
+      <img class="shot" src="../renders/03-international.png" alt="International direction, rendered">
       <div class="meta">
         <div class="n">03</div>
-        <h2>Swiss</h2>
+        <h2>International</h2>
         <p>Maximum confidence, minimum furniture. A visible twelve-column grid, type set very large and
           very tight, hairlines doing all the dividing, exactly one colour.</p>
       </div>
