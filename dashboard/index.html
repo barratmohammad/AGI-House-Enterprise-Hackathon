@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Eval priorities</title>
+<title>Swiss — Eval priorities</title>
 <style>
   /* Tokens by role; dark values are selected, not flipped. The severity ramp is
      one hue, ordered away from the surface in both modes (validated ordinal). */
@@ -18,17 +18,8 @@
     --mark: #fde9b0;
     --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      --page: #0d0d0d; --surface: #1a1a19; --sunk: #242422;
-      --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
-      --hair: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10);
-      --series: #3987e5; --series-quiet: #52514e;
-      --sev-low: #184f95; --sev-medium: #2a78d6; --sev-high: #6da7ec; --sev-critical: #b7d3f6;
-      --good-ink: #0ca30c; --mark: #5c4a12;
-    }
-  }
+  /* Single-theme on purpose: this is projected and shared, so it does not
+     follow the viewer's OS setting. Every colour is painted explicitly above. */
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--page); color: var(--ink);
          font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -36,6 +27,11 @@
            border-bottom: 1px solid var(--hair); background: var(--page);
            position: sticky; top: 0; z-index: 5; }
   h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  /* The demo runs pitch -> dashboard -> pitch, so there has to be a way back. */
+  .back { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600;
+          color:var(--ink-2); text-decoration:none; border:1px solid var(--axis);
+          border-radius:6px; padding:6px 11px; background:var(--surface); white-space:nowrap; }
+  .back:hover { color:var(--ink); border-color:var(--series); }
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
        margin: 0 0 10px; font-weight: 600; }
   h3 { font-size: 17px; margin: 0; font-weight: 600; line-height: 1.3; }
@@ -170,6 +166,7 @@
 </head>
 <body>
 <header>
+  <a class="back" href="../landing/">← Swiss</a>
   <div>
     <h1>Eval priorities</h1>
     <div class="sub">Which failures cost the most, and the eval case each one should become · static snapshot, fictional data</div>
@@ -320,6 +317,7 @@ function renderList() {
           c.still_live && h("span", { class: "chip" }, h("i", { class: "dot", style: "background:var(--warning)" }), "open, still accruing"),
           h("span", { class: "chip" }, (t.source_types || []).map((s) => SRC[s] || s).join(" + ")),
           item.has_eval_draft && h("span", { class: "chip" }, h("span", { class: "ok-ink" }, "✓"), "eval drafted"))));
+    row.dataset.threadId = t.id;   // stable handle so a re-rank can be animated
     return row;
   }));
 }
