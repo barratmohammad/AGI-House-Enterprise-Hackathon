@@ -10,9 +10,14 @@ open landing/05-signal.html                       # the pitch
 open "dashboard/index.html#demo=1"                # the product, armed
 ```
 
-Open both in tabs first and leave them loaded. Check the dashboard header shows a small
-`DEMO 1/5 · Splunk alert fires` chip — that is how you know the live moment is armed. If the
-chip is missing, the `#demo=1` got lost; retype it and reload.
+Open both in tabs first and leave them loaded. Check the dashboard header shows a
+blue-outlined `DEMO 1/5 · Splunk alert fires` chip — that is how you know the live moment is
+armed. If the chip is missing, add `#demo=1` to the dashboard URL and reload.
+
+You can also just open the pitch and **click "Open the dashboard"** — those buttons carry the
+flag, so the natural click path arms it. Once armed it stays armed for the rest of that browser
+session, so a stray reload will not silently disarm you mid-sentence. A judge opening the
+dashboard fresh, in their own browser, gets the plain version with no demo chrome.
 
 Projector check: at **1280×720 or wider** the thread panel scrolls inside its own card, which
 looks controlled. Below ~1250px wide the whole page scrolls instead. Prefer the wider setting.
@@ -60,17 +65,36 @@ event it came from.
 > it claims to come from. And the regression label isn't the model's opinion — it's set by the
 > thread's own history."
 
-## 3 · The live incident (about 60 seconds)
+## 3 · The live incident (about 30 seconds)
 
-**Press Space five times.** One beat per press; you set the pace. Say a line, then press.
+**Say the bridge line first.** The pitch page and the dashboard deliberately show different
+failures — the page pitches what was already found, the demo shows one arriving now. Name that,
+or it reads as a mismatch:
+
+> "Everything so far is the backlog — eight failures already stitched and priced, including that
+> returns-policy one. Now watch what happens when a new one shows up."
+
+Then press **Run** in the header chip. It plays itself — five beats, about twenty seconds. You
+talk over it. **Space** steps manually if you'd rather set the pace; **Reset** draws a fresh one.
+
+**The scenario is drawn at random from three**, so running it twice for two different judges
+doesn't look canned. Whichever you get, the shape is identical:
 
 | Beat | What lands | Say |
 |---|---|---|
-| 1 | Splunk alert, bottom right | "A monitoring alert. It's been firing daily for six days. Nobody acknowledged it." |
-| 2 | Jira ticket + judge proposal | "Now a ticket: customers say cancelled orders still shipped. The judge thinks these are the same fault — 0.86. It proposes; a person decides." |
-| 3 | Accept → thread appears at **#5**, cost 56.25 | "Accepted. It's one story now — ten days live across two tools. One reporter so far, so reach multiplies by one." |
-| 4 | Three emails → climbs to **#2**, cost 99 | "Three more people join. Reach goes to 1.75 and it climbs to number two — above the data leak. The incident didn't get worse; we just found out how far it had spread." |
-| 5 | Eval case drafts | "And there's the eval case. Input, what it actually said, what it should have said, four pass criteria with a grader each — six of six quotes verified." |
+| 1 | A machine alert, bottom right | "A monitoring alert. It's been firing for days. Nobody acknowledged it." |
+| 2 | A ticket + the judge's proposal | "Now a ticket from support. The judge thinks these are the same fault. It proposes; a person decides." |
+| 3 | Accept → thread appears, priced | "Accepted — it's one story now. Days live across two tools, one reporter, so reach multiplies by one." |
+| 4 | Three emails → it climbs | "Three more people join. Reach goes up and it climbs the list. The incident didn't get worse; we just found out how far it had spread." |
+| 5 | Eval case drafts | "And there's the eval case. Input, what it actually said, what it should have said, pass criteria with a grader each — six of six quotes verified." |
+
+The three, and where each lands:
+
+| Scenario | Cost | Enters at |
+|---|---|---|
+| Assistant confirms cancellations that never happened | 99 | #2 |
+| Assistant repeats customers' full card numbers back | 113 | #2 |
+| Assistant promises restock dates from a stale feed | 78 | #3 |
 
 Then land it:
 
@@ -78,16 +102,17 @@ Then land it:
 > That's the whole product."
 
 **One number moves and you should name it rather than hope nobody notices:** the headline
-drops from 72% to 65%, and the event count goes 42 → 47. Say so —
+percentage drops when the ninth thread lands, because the data moved. Say so —
 
 > "The concentration figure just moved, because the data moved. Still two thirds of the cost
 > in three threads out of nine."
 
 ## If it misfires
 
-- Nothing happens on Space → the `#demo=1` is gone. Reload the URL with it and carry on.
-- Beats out of order, or you want to run it again → **press R**. Resets to the original eight
-  threads instantly. Safe to do mid-sentence.
+- No `DEMO` chip in the header → the `#demo=1` is gone. Reload the URL with it and carry on.
+- Want to get back to the pitch → the **← Swiss** button, top left of the dashboard.
+- Want to run it again → **Reset** (or press R). Back to the original eight threads instantly,
+  with a different scenario loaded. Safe to do mid-sentence.
 - Total failure → the static dashboard tells the whole story without the live moment. Skip
   to the eval draft on thread 1 and finish there.
 
@@ -97,7 +122,11 @@ drops from 72% to 65%, and the event count goes 42 → 47. Say so —
 fictional retailer — but the cost model, the stitching rules and the verification are real, and
 you can take any score apart on screen.
 
-**"Isn't the live bit scripted?"** Yes. The incident is scripted; the arithmetic is not. It's
+**"Why doesn't the landing page show this failure?"** Because it isn't one of the eight. The page
+pitches the backlog we'd already stitched and priced; the demo is a ninth incident arriving live.
+That's the point of the product, not a gap in it.
+
+**"Isn't the live bit scripted?"** Yes — three scripted scenarios, drawn at random. The incident is scripted; the arithmetic is not. It's
 priced by the same weights as the other eight threads, and you can check the formula against
 the total in the panel.
 

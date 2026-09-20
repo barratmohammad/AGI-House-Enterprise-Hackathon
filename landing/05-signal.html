@@ -34,38 +34,9 @@
     --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --page:#0d0d0d; --surface:#1a1a19; --sunk:#242422; --line:#2c2c2a;
-      --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781; --axis:#383835;
-      --acc:#3987e5; --quiet:#52514e;
-      --sev-low:#184f95; --sev-medium:#2a78d6; --sev-high:#6da7ec; --sev-critical:#b7d3f6;
-      --good:#0ca30c;
-      --glow: radial-gradient(ellipse 88% 52% at 50% 32%, rgba(57,135,229,.20), transparent 70%);
-      --grad-a:#3987e5; --grad-b:#6da7ec;
-      --shadow-stage: 0 26px 70px rgba(0,0,0,.42);
-      --shadow-btn: none;
-      --ghost-bg: rgba(255,255,255,.04);
-      --acc-edge: rgba(57,135,229,.34);
-      --acc-wash: rgba(57,135,229,.09);
-    }
-  }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --page:#0d0d0d; --surface:#1a1a19; --sunk:#242422; --line:#2c2c2a;
-    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781; --axis:#383835;
-    --acc:#3987e5; --quiet:#52514e;
-    --sev-low:#184f95; --sev-medium:#2a78d6; --sev-high:#6da7ec; --sev-critical:#b7d3f6;
-    --good:#0ca30c;
-    --glow: radial-gradient(ellipse 88% 52% at 50% 32%, rgba(57,135,229,.20), transparent 70%);
-    --grad-a:#3987e5; --grad-b:#6da7ec;
-    --shadow-stage: 0 26px 70px rgba(0,0,0,.42);
-    --shadow-btn: none;
-    --ghost-bg: rgba(255,255,255,.04);
-    --acc-edge: rgba(57,135,229,.34);
-    --acc-wash: rgba(57,135,229,.09);
-  }
+  /* Deliberately single-theme: this page is projected and shared, so it does
+     not follow the viewer's OS setting. Every colour is painted explicitly
+     above, so it holds on either host ground. */
 
   * { box-sizing:border-box; }
   html { overflow-x:clip; }
@@ -197,7 +168,7 @@
     <span class="sp"></span>
     <a href="#method">Method</a>
     <a href="#case">Output</a>
-    <a href="../dashboard/index.html">Dashboard →</a>
+    <a href="../dashboard/index.html#demo=1">Dashboard →</a>
   </div>
 </header>
 
@@ -211,7 +182,7 @@
        monitoring, joined up nowhere. Swiss stitches them into one story per incident, prices
        each one, and drafts the eval case for the ones that cost the most.</p>
     <div class="btns">
-      <a class="btn" href="../dashboard/index.html">Open the dashboard</a>
+      <a class="btn" href="../dashboard/index.html#demo=1">Open the dashboard</a>
       <a class="btn g" href="#method">See how it works</a>
     </div>
   </div>
@@ -309,7 +280,7 @@
        anything the assistant <i>said</i>. Swiss drafts a threshold check and says so, rather
        than inventing a prompt.</p>
     <div class="btns">
-      <a class="btn" href="../dashboard/index.html">Open the dashboard</a>
+      <a class="btn" href="../dashboard/index.html#demo=1">Open the dashboard</a>
       <a class="btn g" href="./index.html">Other directions</a>
     </div>
   </div>
